@@ -3,9 +3,9 @@ import { ScrollView, Text } from 'react-native';
 
 import { MlKitLatinOcrEngine } from '@/platform/ocr/android/MlKitLatinOcrEngine';
 
-// Dev-only spike: runs OCR over fixtures pushed to the app's external files dir
+// Dev-only spike: runs OCR over fixtures copied into the app's internal files dir
 // (see docs/STATUS.md) and logs results for tests/ocr-accuracy/run.js.
-const FIXTURES_DIR = 'file:///sdcard/Android/data/com.snapshelf.app/files/fixtures';
+const FIXTURES_DIR = 'file:///data/data/com.snapshelf.app/files/fixtures';
 const FIXTURES = ['ru-notes', 'ru-chat', 'en-article', 'en-settings', 'pl-todo', 'pl-message'];
 
 export default function OcrSpike() {

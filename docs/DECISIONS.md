@@ -30,7 +30,10 @@
 - **OCR spike engine: ML Kit bundled Latin** (`com.google.mlkit:text-recognition:16.0.1`), not the Play Services variant:
   the bundled model works offline and needs no runtime model download (CLAUDE.md rule 7).
 - **No Cyrillic ML Kit artifact exists** on Google Maven (checked `group-index.xml`: only latin, chinese, devanagari,
-  japanese, korean). The Russian decision is deliberately left open until measured on a device.
+  japanese, korean). **Measured:** the Latin recognizer gives CER 66.9% on ru fixtures (threshold 10%), en 0.2%, pl 0.6%.
+  ML Kit is fine for en/pl; it cannot be used for Russian.
+- **Russian decision: PENDING user confirmation.** Proposal: second `OcrEngine` on Tesseract (`rus+eng+pol`
+  traineddata), chosen per detected script, as CLAUDE.md section 7 prescribes. Nothing has been added yet.
 - **Native API**: `ScreenshotOcr.recognize(imageUri, engine)` takes an engine id so a second engine (Tesseract) can be
   added behind the same call if needed. Unknown engine ids reject with `ERR_OCR_ENGINE`.
 - **Fixtures are synthetic** (Pillow + Segoe UI, ru/en/pl, light and dark), because no real fixtures were provided.

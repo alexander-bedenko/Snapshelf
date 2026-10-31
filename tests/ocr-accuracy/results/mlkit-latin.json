@@ -1,0 +1,100 @@
+{
+  "engine": "mlkit-latin",
+  "threshold": 0.1,
+  "perLanguage": {
+    "en": {
+      "distance": 1,
+      "refLength": 506,
+      "count": 2,
+      "cer": 0.001976284584980237
+    },
+    "pl": {
+      "distance": 3,
+      "refLength": 467,
+      "count": 2,
+      "cer": 0.006423982869379015
+    },
+    "ru": {
+      "distance": 347,
+      "refLength": 519,
+      "count": 2,
+      "cer": 0.6685934489402697
+    }
+  },
+  "rows": [
+    {
+      "name": "en-article",
+      "distance": 1,
+      "refLength": 302,
+      "cer": 0.0033112582781456954
+    },
+    {
+      "name": "en-settings",
+      "distance": 0,
+      "refLength": 204,
+      "cer": 0
+    },
+    {
+      "name": "pl-message",
+      "distance": 1,
+      "refLength": 234,
+      "cer": 0.004273504273504274
+    },
+    {
+      "name": "pl-todo",
+      "distance": 2,
+      "refLength": 233,
+      "cer": 0.008583690987124463
+    },
+    {
+      "name": "ru-chat",
+      "distance": 186,
+      "refLength": 255,
+      "cer": 0.7294117647058823
+    },
+    {
+      "name": "ru-notes",
+      "distance": 161,
+      "refLength": 264,
+      "cer": 0.6098484848484849
+    }
+  ],
+  "results": [
+    {
+      "name": "ru-notes",
+      "engine": "mlkit-latin",
+      "durationMs": 1550,
+      "text": "3ameTKM\nCnvcoK Aen Ha nATHVLY\nKynuTb MONOKOM XNe6\nMo3BOHMTb Bpa4y B 15:30\nHyKHO oTnpaBnTb oT4ëT Ao 3aBTpa\nOnnaTMTb VHTepHeT V 9NeKTpMyeCTBO\nBcTpe4ac KOMaHĄ0ṁ 12 Mapra\nCaňT npoeKra: https://example.com/plan\nlo4ra: ivan.petrov@example.com\nTeneoH: +7912 345 67 89"
+    },
+    {
+      "name": "ru-chat",
+      "engine": "mlkit-latin",
+      "durationMs": 877,
+      "text": "Coo6ueHMA\nNpuBer! Kak gena?\nBcë xopOWo, cnacubo. PaboTao Han npunoKeHMe\nKorga cMOKeWb ipucnaTb AOKYMeHTbI?\nCerogHA BeYepOM, nOCNe WecTM 4acOB.\nXopowo, KAy. He 3a6yAb nipo AoroBop.\nCbiNKa Ha nanky: https://disk.example.ru/docs\nYBIAMMCA B NOHenentHMyTpom!"
+    },
+    {
+      "name": "en-article",
+      "engine": "mlkit-latin",
+      "durationMs": 858,
+      "text": "Reading list\nHow to organise your digital life\nScreenshots pile up quickly on any phone.\nMost of them contain links, dates and tasks.\nRemember to review them every week.\nRead more at https://example.com/articles/42\nContact: support@example.com\nCall us: +1202 555 0143\nDeadline is October 31 at 9:00 AM"
+    },
+    {
+      "name": "en-settings",
+      "engine": "mlkit-latin",
+      "durationMs": 837,
+      "text": "Settings\nNotifications\nAllow notifications from this app\nChoose when you want to be reminded\nPrivacy and security\nAll data stays on your device\nStorage used: 128 MB of 2 GB\nNeed to back up before updating"
+    },
+    {
+      "name": "pl-todo",
+      "engine": "mlkit-latin",
+      "durationMs": 777,
+      "text": "Zadania\nLista zakupów na weekend\nTrzeba kupić mleko, chleb i jajka\nZadzwonić do lekarza jutro rano\nSpotkanie w środęo 14:00\nZażółć gęślą jaźń\nŽółw łączy się z Łodzią\nStrona: https://example.pl/zakupy\nE-mail: anna.kowalska@example.pl"
+    },
+    {
+      "name": "pl-message",
+      "engine": "mlkit-latin",
+      "durationMs": 822,
+      "text": "Wiadomości\nCześć! Co słychać?\nWszystko dobrze, dziękuję za pytanie.\nKiedy możesz przystać dokumenty?\nWieczorem, po godzinie osiemnastej.\nŚwietnie, czekam na wiadomość.\nDo zobaczenia w poniedziałek rano!\nNumer telefonu: +48 501 234 567"
+    }
+  ]
+}

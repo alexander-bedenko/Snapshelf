@@ -1,6 +1,9 @@
 # Blockers
 
-## B1 — M1: no ADB access to the test device, ML Kit not measured (open)
+## B1 — M1: no ADB access to the physical test device (RESOLVED by workaround)
+
+Resolved by running on an x86_64 emulator (user-approved). The physical Redmi Note 9S still exposes only MTP
+(`USB\VID_2717&PID_FF40`, no ADB interface); original notes below.
 
 **Needed:** run the ML Kit (Latin) recognizer on the ru/en/pl fixtures on a real device and compute CER.
 

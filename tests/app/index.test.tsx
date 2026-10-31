@@ -25,6 +25,7 @@ function stubStore(initial: Partial<LibraryState> = {}): LibraryStore {
     init: jest.fn(async () => set({ initialized: true, permission: 'undetermined' })),
     requestPermission: jest.fn(async () => set({ permission: 'denied' })),
     refresh: jest.fn(async () => undefined),
+    onForeground: jest.fn(async () => undefined),
     dispose: jest.fn(),
     ...initial,
   }));

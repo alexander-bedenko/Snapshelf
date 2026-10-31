@@ -22,6 +22,46 @@ async function setup(source: FakeScreenshotSource, path = ':memory:') {
 }
 
 describe('library store: permission flow', () => {
+  it('picks up access granted in system settings when the app returns to the foreground', async () => {
+    const source = new FakeScreenshotSource({ permission: 'blocked', screenshots: refs(2) });
+    const { store } = await setup(source);
+    await store.getState().init();
+    expect(store.getState().permission).toBe('blocked');
+    expect(source.listCount).toBe(0);
+
+    source.permission = 'granted'; // the user flipped the switch in settings
+    await store.getState().onForeground();
+
+    expect(store.getState().permission).toBe('granted');
+    await waitFor(() => store.getState().counts.done === 2);
+  });
+
+  it('keeps the blocked state when nothing changed in settings', async () => {
+    const source = new FakeScreenshotSource({ permission: 'blocked', screenshots: refs(2) });
+    const { store } = await setup(source);
+    await store.getState().init();
+
+    await store.getState().onForeground();
+
+    expect(store.getState().permission).toBe('blocked');
+    expect(source.listCount).toBe(0);
+  });
+
+  it('notices access revoked in the background and stops listing', async () => {
+    const source = new FakeScreenshotSource({ screenshots: refs(1) });
+    const { store } = await setup(source);
+    await store.getState().init();
+    await waitFor(() => store.getState().counts.done === 1);
+    const lists = source.listCount;
+
+    source.permission = 'undetermined';
+    await store.getState().onForeground();
+
+    expect(store.getState().permission).toBe('undetermined');
+    expect(source.listCount).toBe(lists);
+    expect(store.getState().items).toHaveLength(1); // stored data stays visible
+  });
+
   it('does not ask for permission at launch, it only reports that it is needed', async () => {
     const { store, source, ocr } = await setup(
       new FakeScreenshotSource({ permission: 'undetermined', screenshots: refs(3) }),

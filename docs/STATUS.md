@@ -9,6 +9,50 @@
   `ANDROID_AVD_HOME=D:\Android\avd`, WHPX acceleration). JDK 17 and Android SDK installed in M1.
 - Not macOS: iOS cannot be built here.
 
+## Milestone: M2 (import + persist) — DONE on the emulator; M1 is still open
+
+M2 was started on the user's explicit request although M1's "Done when" is not met (Russian OCR fails the 10% CER
+threshold, see M1 below). The pipeline takes the OCR engine through `OcrEngine`, so a Russian-capable engine can be
+swapped in later. Until then Russian screenshots are stored with garbage text (ML Kit Latin).
+
+### Verified (commands run)
+
+- `npm run check` — typecheck, lint, **97 tests in 12 suites** pass; `npm run format:check` passes.
+- Mutation check: breaking the concurrency limit and `recoverInterrupted` makes 6 tests fail; reverted.
+- `gradlew assembleDebug -PreactNativeArchitectures=x86_64` — builds with the new `screenshot-media` module; merged
+  manifest has `READ_MEDIA_IMAGES` and `READ_EXTERNAL_STORAGE` (maxSdkVersion 32).
+- On the x86_64 emulator (Android 14, API 34), debug build + Metro, driven with `adb` / `uiautomator`:
+  - Launch: the explanation card is shown, **no system dialog at launch**.
+  - Permission denied once → "Access was not granted" + "Try again"; denied twice ("Don't allow") → blocked card;
+    "Open settings" opens the system app settings; `pm grant` while the app is in the background, then returning →
+    permission is detected and the library syncs (foreground re-check).
+  - No screenshots (only a non-screenshot image in `/sdcard`): empty state "No screenshots yet".
+  - 6 fixtures pushed to `Pictures/Screenshots` while the app was open: picked up by the ContentObserver, processed
+    ("Processed 6 of 6"). `Pictures/Other/holiday.png` was correctly ignored.
+  - Kill/restart: 24 more screenshots, `am force-stop` at ~16 of 30. DB pulled right after the kill: 18 done, 4 pending,
+    8 processing (schema v2). After restart: **30 done, 30 distinct ids, 0 empty texts**; the 8 interrupted rows have
+    `attempts=2`, the other 22 `attempts=1`; FTS finds the text (`notifications` 7 hits, `lista` 7 hits, as expected).
+
+### NOT verified / known gaps
+
+- No physical device (the Redmi never exposed ADB). Timing and UI smoothness on real hardware are unknown.
+- "Never blocks the UI thread" is by design only: ML Kit runs on its own thread, SQLite through expo-sqlite's async
+  API, the pipeline yields to the event loop between batches (tested with timers). No frame-time/jank measurement.
+- Android < 13 (`READ_EXTERNAL_STORAGE`, `DATA LIKE` query) path: permission mapping is unit-tested, the query was not
+  run on an API < 29/33 device.
+- Android 14 "Select photos and videos" (partial access) is offered by the system dialog; choosing it does not grant
+  full access, so the app keeps treating the permission as not granted. Partial access is not supported yet.
+- Screenshot detection is by folder name (`RELATIVE_PATH LIKE '%Screenshot%'`), which fits Pixel/Samsung/Xiaomi but not
+  every vendor or locale.
+- No WorkManager catch-up scans (CLAUDE.md section 12): new screenshots are found while the process is alive and on the
+  next foreground/start scan.
+- The list shows the newest 200 screenshots (no pagination yet); screenshots deleted from the gallery are not removed
+  from the index (M5).
+- Large library (thousands of screenshots) not measured.
+- Maestro e2e flow not written (M4 covers e2e).
+- Finding for M3: FTS5 `remove_diacritics` does not fold Polish `ł` (no Unicode decomposition), so `zazolc` will not
+  find `zażółć`. M3 needs query/index folding for `ł`.
+
 ## Milestone: M1 (Android OCR spike) — MEASURED; Russian FAILS the threshold, decision pending user confirmation
 
 ### ML Kit (bundled Latin, 16.0.1) results — emulator, 6 synthetic fixtures
@@ -64,7 +108,9 @@ Russian output is Latin-lookalike transliteration (e.g. "Заметки" -> "3am
 
 - **App launch on Android**: the debug build installs and launches on the x86_64 emulator (dev client + Metro, the
   `/ocr-spike` route ran). Not verified on a physical device.
-- **FTS5 on-device with `expo-sqlite`**: only the build flags were checked statically; the Jest test uses Node's SQLite.
+- **FTS5 on-device with `expo-sqlite`**: partly closed in M2. The schema with the FTS5 table and triggers was created by
+  expo-sqlite on the emulator and the index returned hits when the DB was read back on the host. Search queries
+  and latency inside the app are still unverified (M3).
 - `npm run e2e:android`: Maestro not installed, no flows exist yet (`e2e/` is empty).
 - **iOS**: `UNVERIFIED (not built)`; nothing iOS-specific written yet.
 
@@ -91,5 +137,5 @@ npm run ocr:accuracy -- --adb                    # after OCR_SPIKE_DONE appears 
 
 ### Next
 
-- User decision on the Russian OCR engine (see DECISIONS.md, M1).
-- Close M0 on-device FTS5 check (expo-sqlite) on the emulator.
+- User decision on the Russian OCR engine (see DECISIONS.md, M1); M1 stays open until then.
+- M3: full-text search UI/queries (fold Polish `ł`, latency on 5,000 rows).

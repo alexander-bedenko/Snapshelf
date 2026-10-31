@@ -25,6 +25,33 @@
 - **Platforms**: `android`, `ios` only (web removed).
 - **Line endings**: LF enforced via `.gitattributes`.
 
+## M2
+
+- **Data model**: v1 is the CLAUDE.md section 5 schema; v2 adds `attempts` and `next_retry_at` (retry with backoff,
+  section 6). Done before M3, so no "change after M3" approval is needed. Versioned via `PRAGMA user_version`, each
+  migration in its own transaction, downgrade refused; tested from empty and from v1 with data.
+- **Repository over a tiny SQL port** (`SqlDb`/`RawDb`): the same `SqliteRepository` runs on expo-sqlite (device) and
+  `node:sqlite` (Jest). A mutex serializes statements/transactions on the single connection, because concurrent
+  pipeline workers would otherwise issue nested `BEGIN`.
+- **Attempts are counted at claim time**, not on failure: an image that kills the process on every attempt is
+  eventually marked failed ("Interrupted too many times") instead of crash-looping.
+- **Kill recovery**: `recoverInterrupted` runs at start; `processing` rows go back to `pending`. Writing a result
+  (`markProcessed`) is one transaction.
+- **Pipeline**: batch of 10 claimed newest first, at most 2 OCR calls in flight, yields to the event loop between
+  batches, single-flight `processPending` with a re-run flag, exponential backoff 30 s … 1 h, max 5 attempts.
+- **No permission prompt at launch** (section 12): the store only reads the permission; the UI explains first and the
+  system dialog is shown on the button. `blocked` (don't ask again) offers system settings; returning to the app
+  re-checks the permission (`onForeground`).
+- **Permissions via React Native `PermissionsAndroid`** (no `expo-media-library` dependency): `READ_MEDIA_IMAGES` on
+  API 33+, `READ_EXTERNAL_STORAGE` below. Manifest entries live in the `screenshot-media` module.
+- **Screenshot detection**: MediaStore `RELATIVE_PATH LIKE '%Screenshot%'` (API 29+; `DATA` before), not pending.
+  Timestamp = `DATE_TAKEN`, falling back to `DATE_ADDED * 1000`.
+- **New screenshots**: `ContentObserver` event → debounced JS re-scan from the last seen timestamp (idempotent upsert).
+- **zustand 5.0.16** (in the CLAUDE.md stack) holds UI state; the store is framework-free (`zustand/vanilla`).
+- **UI strings**: tiny ru/en dictionary (`src/ui/strings.ts`), no i18n dependency.
+- **Test note**: awaiting `fireEvent.press` hangs under RNTL 14 when the press synchronously updates a
+  `useSyncExternalStore` store; the index test does not await the press and waits for the visible result instead.
+
 ## M1
 
 - **OCR spike engine: ML Kit bundled Latin** (`com.google.mlkit:text-recognition:16.0.1`), not the Play Services variant:

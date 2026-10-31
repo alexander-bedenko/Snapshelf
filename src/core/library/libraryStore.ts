@@ -20,6 +20,8 @@ export type LibraryState = {
   init(): Promise<void>;
   requestPermission(): Promise<void>;
   refresh(): Promise<void>;
+  /** Call when the app returns to the foreground (e.g. after the user visited system settings). */
+  onForeground(): Promise<void>;
   dispose(): void;
 };
 
@@ -61,6 +63,7 @@ export function createLibraryStore(deps: LibraryDeps): LibraryStore {
     init,
     requestPermission,
     refresh,
+    onForeground,
     dispose,
   }));
   const set = store.setState;
@@ -143,6 +146,22 @@ export function createLibraryStore(deps: LibraryDeps): LibraryStore {
   async function refresh() {
     if (store.getState().permission !== 'granted') return;
     await syncAndProcess();
+  }
+
+  async function onForeground() {
+    const state = store.getState();
+    if (!state.initialized || state.syncing) return;
+    try {
+      const permission = await source.getPermission();
+      if (permission === 'granted') {
+        await syncAndProcess();
+      } else if (state.permission === 'granted') {
+        // Revoked while the app was in the background.
+        set({ permission });
+      }
+    } catch (error) {
+      fail(error);
+    }
   }
 
   function dispose() {

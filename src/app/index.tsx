@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, Text, View } from 'react-native';
 import { useStore } from 'zustand';
 
 import type { LibraryStore } from '@/core/library/libraryStore';
@@ -11,6 +11,14 @@ const strings = getStrings(deviceLocale());
 
 function Connected({ store }: { store: LibraryStore }) {
   const state = useStore(store);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next === 'active') void store.getState().onForeground();
+    });
+    return () => subscription.remove();
+  }, [store]);
+
   return (
     <LibraryScreen
       state={state}

@@ -24,3 +24,20 @@
 - **Application id**: `com.snapshelf.app` (Android package and iOS bundle id). Placeholder, change before any release.
 - **Platforms**: `android`, `ios` only (web removed).
 - **Line endings**: LF enforced via `.gitattributes`.
+
+## M1
+
+- **OCR spike engine: ML Kit bundled Latin** (`com.google.mlkit:text-recognition:16.0.1`), not the Play Services variant:
+  the bundled model works offline and needs no runtime model download (CLAUDE.md rule 7).
+- **No Cyrillic ML Kit artifact exists** on Google Maven (checked `group-index.xml`: only latin, chinese, devanagari,
+  japanese, korean). The Russian decision is deliberately left open until measured on a device.
+- **Native API**: `ScreenshotOcr.recognize(imageUri, engine)` takes an engine id so a second engine (Tesseract) can be
+  added behind the same call if needed. Unknown engine ids reject with `ERR_OCR_ENGINE`.
+- **Fixtures are synthetic** (Pillow + Segoe UI, ru/en/pl, light and dark), because no real fixtures were provided.
+  Reference text includes the title; status-bar text is not rendered so the reference is complete.
+- **CER definition**: NFC, whitespace collapsed, case-sensitive Levenshtein over code points, aggregated per language
+  weighted by reference length; threshold 10% (CLAUDE.md section 7).
+- **Spike transport**: dev-only route `/ocr-spike` logs `OCR_SPIKE {json}` lines (guarded by `__DEV__`, so no OCR text
+  is logged in release builds); `ocr:accuracy --adb` parses logcat.
+- **Windows build**: path-length failure fixed locally by replacing SDK ninja (see STATUS.md). Repo path is long;
+  a shorter checkout path would also avoid this.

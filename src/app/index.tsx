@@ -1,17 +1,60 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Text, View } from 'react-native';
+import { useStore } from 'zustand';
 
-export default function Index() {
+import type { LibraryStore } from '@/core/library/libraryStore';
+import { LibraryScreen } from '@/ui/LibraryScreen';
+import { getLibraryStore, openAppSettings } from '@/ui/services';
+import { deviceLocale, getStrings } from '@/ui/strings';
+
+const strings = getStrings(deviceLocale());
+
+function Connected({ store }: { store: LibraryStore }) {
+  const state = useStore(store);
   return (
-    <View style={styles.container}>
-      <Text>Snapshelf</Text>
-    </View>
+    <LibraryScreen
+      state={state}
+      actions={{
+        requestPermission: () => void state.requestPermission(),
+        refresh: () => void state.refresh(),
+        openSettings: openAppSettings,
+      }}
+      strings={strings}
+    />
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+export default function Index() {
+  const [store, setStore] = useState<LibraryStore | null>(null);
+  const [bootError, setBootError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getLibraryStore()
+      .then((s) => {
+        if (cancelled) return;
+        setStore(s);
+        if (!s.getState().initialized) void s.getState().init();
+      })
+      .catch((e) => setBootError(e instanceof Error ? e.message : String(e)));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (bootError) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', padding: 24 }}>
+        <Text>{strings.error(bootError)}</Text>
+      </View>
+    );
+  }
+  if (!store) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator />
+      </View>
+    );
+  }
+  return <Connected store={store} />;
+}

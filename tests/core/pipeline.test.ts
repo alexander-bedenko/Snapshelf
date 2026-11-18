@@ -35,8 +35,8 @@ describe('ScreenshotPipeline.sync', () => {
   it('queues every screenshot the source reports', async () => {
     const { pipeline, repo } = await setup({}, new FakeScreenshotSource({ screenshots: refs(3) }));
 
-    expect(await pipeline.sync()).toEqual({ status: 'ok', found: 3, inserted: 3 });
-    expect(await pipeline.sync()).toEqual({ status: 'ok', found: 3, inserted: 0 });
+    expect(await pipeline.sync()).toEqual({ status: 'ok', found: 3, inserted: 3, pruned: 0 });
+    expect(await pipeline.sync()).toEqual({ status: 'ok', found: 3, inserted: 0, pruned: 0 });
     expect((await repo.countByStatus()).pending).toBe(3);
   });
 
@@ -376,5 +376,57 @@ describe('ScreenshotPipeline: extraction (M4)', () => {
     });
 
     expect(await repo.getEntities('s1')).toHaveLength(1);
+  });
+});
+
+describe('ScreenshotPipeline: gallery changes (M5)', () => {
+  it('drops screenshots deleted from the gallery on the next sync', async () => {
+    const source = new FakeScreenshotSource({ screenshots: refs(3) });
+    const { pipeline, repo } = await setup({}, source);
+    await pipeline.sync();
+    await pipeline.processPending();
+
+    source.screenshots = source.screenshots.filter((s) => s.id !== 's2');
+
+    expect(await pipeline.sync()).toEqual({ status: 'ok', found: 2, inserted: 0, pruned: 1 });
+    expect((await repo.list()).map((r) => r.id)).toEqual(['s3', 's1']);
+  });
+
+  it('does not wipe the index when the gallery query returns nothing', async () => {
+    const source = new FakeScreenshotSource({ screenshots: refs(2) });
+    const { pipeline, repo } = await setup({}, source);
+    await pipeline.sync();
+
+    source.screenshots = [];
+
+    expect(await pipeline.sync()).toEqual({ status: 'empty' });
+    expect(await repo.list()).toHaveLength(2);
+  });
+
+  it('does not bring back a screenshot the user removed from the index', async () => {
+    const source = new FakeScreenshotSource({ screenshots: refs(2) });
+    const { pipeline, repo } = await setup({}, source);
+    await pipeline.sync();
+    await repo.removeFromIndex('s1', 5);
+
+    expect(await pipeline.sync()).toEqual({ status: 'ok', found: 2, inserted: 0, pruned: 0 });
+    expect((await repo.list()).map((r) => r.id)).toEqual(['s2']);
+  });
+
+  it('survives a screenshot removed while its OCR is running', async () => {
+    const source = new FakeScreenshotSource({ screenshots: refs(1) });
+    const { pipeline, repo, ocr } = await setup({}, source);
+    ocr.manual = true;
+    ocr.setText(ref(1).uri, 'a@b.com tomorrow');
+    await pipeline.sync();
+    const run = pipeline.processPending();
+    await waitFor(() => ocr.heldUris.length === 1);
+
+    await repo.removeFromIndex('s1', 5);
+    ocr.releaseAll();
+
+    await expect(run).resolves.toEqual({ done: 1, failed: 0 });
+    expect(await repo.getById('s1')).toBeNull();
+    expect(await repo.getEntities('s1')).toEqual([]);
   });
 });

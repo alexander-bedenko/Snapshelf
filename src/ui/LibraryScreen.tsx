@@ -35,6 +35,7 @@ export type LibraryScreenProps = {
     openSettings(): void;
     setQuery(query: string): void;
     openScreenshot(id: string): void;
+    openSettingsScreen(): void;
   };
   strings: Strings;
 };
@@ -142,7 +143,17 @@ export function LibraryScreen(props: LibraryScreenProps) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{strings.title}</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>{strings.title}</Text>
+        <Pressable
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={actions.openSettingsScreen}
+          testID="settings-link"
+        >
+          <Text style={styles.link}>{strings.settings}</Text>
+        </Pressable>
+      </View>
       {total > 0 ? (
         <Text style={styles.body} testID="progress">
           {strings.progress(state.counts.done, total)}
@@ -212,6 +223,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 56, paddingHorizontal: 16 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
   title: { fontSize: 28, fontWeight: '700', marginBottom: 4 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  link: { fontSize: 16, color: '#208AEF' },
   body: { fontSize: 15, color: '#444' },
   error: { color: '#b00020', marginVertical: 8 },
   card: { backgroundColor: '#f2f4f8', borderRadius: 12, padding: 16, marginVertical: 12, gap: 8 },

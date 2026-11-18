@@ -67,7 +67,7 @@ describe('app killed in the middle of processing and restarted', () => {
     });
 
     expect(await run2.pipeline.recover()).toBe(3);
-    expect(await run2.pipeline.sync()).toEqual({ status: 'ok', found: 4, inserted: 0 });
+    expect(await run2.pipeline.sync()).toEqual({ status: 'ok', found: 4, inserted: 0, pruned: 0 });
     expect(await run2.repo.countByStatus()).toEqual({
       pending: 3,
       processing: 0,

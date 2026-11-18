@@ -25,6 +25,7 @@ describe('migrations', () => {
         'screenshots_ai',
         'screenshots_ad',
         'screenshots_au',
+        'removed_screenshots',
       ]),
     );
     const cols = await db.all<{ name: string }>('PRAGMA table_info(screenshots)');
@@ -94,6 +95,22 @@ describe('migrations', () => {
       `SELECT rowid FROM screenshots_fts WHERE screenshots_fts MATCH 'елки'`,
     );
     expect(yo).toHaveLength(1);
+  });
+
+  it('v4 adds the removed-screenshots table and keeps existing rows', async () => {
+    const path = tempDbPath();
+    const v3 = await openTestDb(path, 3);
+    await v3.run(
+      `INSERT INTO screenshots (id, uri, taken_at, status, ocr_text, search_text)
+       VALUES ('a', 'u', 5, 'done', 'x', 'x')`,
+    );
+    await v3.close();
+
+    const upgraded = await openTestDb(path);
+
+    expect(await getSchemaVersion(upgraded)).toBe(4);
+    expect(await upgraded.all('SELECT id FROM screenshots')).toEqual([{ id: 'a' }]);
+    expect(await upgraded.all('SELECT * FROM removed_screenshots')).toEqual([]);
   });
 
   it('is idempotent when run again on an up-to-date database', async () => {

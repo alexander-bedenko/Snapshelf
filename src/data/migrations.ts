@@ -92,10 +92,20 @@ END;
 INSERT INTO screenshots_fts(screenshots_fts) VALUES ('rebuild');
 `;
 
+// v4 (M5, approved by the user 2026-11-18): screenshots removed from the app index (the photo stays
+// in the gallery). Their ids are remembered so the next gallery scan does not add them again.
+const V4 = `
+CREATE TABLE removed_screenshots (
+  id TEXT PRIMARY KEY,
+  removed_at INTEGER NOT NULL
+);
+`;
+
 export const MIGRATIONS: Migration[] = [
   { version: 1, sql: V1 },
   { version: 2, sql: V2 },
   { version: 3, sql: V3 },
+  { version: 4, sql: V4 },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

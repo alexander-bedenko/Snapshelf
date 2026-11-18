@@ -25,6 +25,21 @@
 - **Platforms**: `android`, `ios` only (web removed).
 - **Line endings**: LF enforced via `.gitattributes`.
 
+## M5
+
+- **Schema v4, approved by the user (2026-11-18)**: `removed_screenshots(id, removed_at)`. Removing deletes the
+  screenshot row (cascading entities, FTS via triggers) and stores the id; `upsertDiscovered` skips stored ids.
+  Chosen over a `hidden` column so removed screenshots keep no OCR text on the device.
+- **Pruning on sync**: `sync()` lists the whole gallery, so ids missing from it are deleted from the index and from
+  `removed_screenshots`. An empty listing never prunes. Ids are processed in chunks of 500 (SQLite parameter limit).
+- **`markProcessed` is a no-op for a row that no longer exists** (removed/pruned during OCR); entities are not
+  inserted, so the foreign key cannot fail.
+- **Requeue** resets `attempts`, `error`, `next_retry_at` and sets `pending`, but keeps the old text until the new
+  result is written; `processing` rows are excluded to avoid double OCR.
+- **Remove confirmation is inline** (no `Alert`), so it is testable and states that the photo stays in the gallery.
+- **Detail screen refreshes on library changes** (subscribes to the library store), so a reprocessed screenshot
+  updates without leaving the screen.
+
 ## M4
 
 - **Order**: M4 started before M1/M3 were verified on the emulator, user decision 2026-11-18.

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import type { Repository, StoredEntity } from '@/core/repository';
 import type { ScreenshotRecord } from '@/core/types';
@@ -72,18 +72,43 @@ function fakeDeps(options: { record?: ScreenshotRecord | null; items?: StoredEnt
       return true;
     }),
   };
-  const deps: DetailDeps = {
+  const listeners = new Set<() => void>();
+  const deps = {
     getRepository: async () => repo as unknown as Repository,
     openUrl: jest.fn(async () => undefined),
-  };
-  return { deps, repo };
+    reprocess: jest.fn(async (): Promise<unknown> => 1),
+    remove: jest.fn(async (): Promise<boolean> => true),
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  } satisfies DetailDeps;
+  /** Simulates the library store reporting a change (e.g. the pipeline finished). */
+  const notify = () => listeners.forEach((l) => l());
+  return { deps, repo, notify };
 }
 
-function Detail({ deps, strings = en }: { deps: DetailDeps; strings?: Strings }) {
+function Detail({
+  deps,
+  strings = en,
+  back = jest.fn(),
+}: {
+  deps: DetailDeps;
+  strings?: Strings;
+  back?: () => void;
+}) {
   const detail = useScreenshotDetail('s1', deps, strings);
   return (
     <ScreenshotDetailScreen
-      actions={{ press: (e) => void detail.press(e), back: jest.fn() }}
+      actions={{
+        press: (e) => void detail.press(e),
+        back,
+        reprocess: () => void detail.reprocess(),
+        remove: () =>
+          void detail.remove().then((removed) => {
+            if (removed) back();
+          }),
+      }}
       entities={detail.entities}
       error={detail.error}
       loading={detail.loading}
@@ -175,5 +200,69 @@ describe('screenshot detail ("found items")', () => {
     await render(<Detail deps={deps} strings={ru} />);
     await waitFor(() => expect(screen.getByText(ru.foundTitle)).toBeTruthy());
     expect(screen.getByText(ru.entityLabel.task)).toBeTruthy();
+  });
+
+  it('reads a screenshot again and shows progress until the library reports it done', async () => {
+    let current: ScreenshotRecord = { ...RECORD };
+    const { deps, repo, notify } = fakeDeps();
+    repo.getById.mockImplementation(async () => current);
+    deps.reprocess.mockImplementation(async () => {
+      current = { ...current, status: 'pending' };
+      return 1;
+    });
+    await render(<Detail deps={deps} />);
+    await waitFor(() => expect(screen.getByTestId('reprocess')).toBeTruthy());
+
+    await fireEvent.press(screen.getByTestId('reprocess'));
+
+    expect(deps.reprocess).toHaveBeenCalledWith('s1');
+    await waitFor(() => expect(screen.getByTestId('detail-busy')).toBeTruthy());
+    expect(screen.queryByTestId('reprocess')).toBeNull();
+
+    current = { ...current, status: 'done', ocrText: 'fresh text' };
+    await act(async () => notify());
+    await waitFor(() => expect(screen.getByTestId('ocr-text').props.children).toBe('fresh text'));
+    expect(screen.queryByTestId('detail-busy')).toBeNull();
+  });
+
+  it('shows why processing failed', async () => {
+    const { deps } = fakeDeps({ record: { ...RECORD, status: 'failed', error: 'bad image' } });
+    await render(<Detail deps={deps} />);
+    await waitFor(() => expect(screen.getByTestId('detail-failed')).toBeTruthy());
+    expect(screen.getByText(`${en.status.failed}: bad image`)).toBeTruthy();
+  });
+
+  it('asks before removing from Snapshelf, says the photo stays, and goes back', async () => {
+    const { deps } = fakeDeps();
+    const back = jest.fn();
+    await render(<Detail back={back} deps={deps} />);
+    await waitFor(() => expect(screen.getByTestId('remove')).toBeTruthy());
+
+    await fireEvent.press(screen.getByTestId('remove'));
+    expect(screen.getByText(en.removeConfirmBody)).toBeTruthy();
+    expect(deps.remove).not.toHaveBeenCalled();
+
+    await fireEvent.press(screen.getByTestId('cancel-remove'));
+    expect(screen.queryByTestId('remove-confirmation')).toBeNull();
+
+    await fireEvent.press(screen.getByTestId('remove'));
+    await fireEvent.press(screen.getByTestId('confirm-remove'));
+
+    expect(deps.remove).toHaveBeenCalledWith('s1');
+    await waitFor(() => expect(back).toHaveBeenCalledTimes(1));
+  });
+
+  it('stays on the screen when removal did not happen', async () => {
+    const { deps } = fakeDeps();
+    deps.remove.mockResolvedValueOnce(false);
+    const back = jest.fn();
+    await render(<Detail back={back} deps={deps} />);
+    await waitFor(() => expect(screen.getByTestId('remove')).toBeTruthy());
+
+    await fireEvent.press(screen.getByTestId('remove'));
+    await fireEvent.press(screen.getByTestId('confirm-remove'));
+
+    await waitFor(() => expect(deps.remove).toHaveBeenCalled());
+    expect(back).not.toHaveBeenCalled();
   });
 });

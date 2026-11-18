@@ -9,6 +9,12 @@ import type { Strings } from './strings';
 export type DetailDeps = {
   getRepository(): Promise<Repository>;
   openUrl(url: string): Promise<void>;
+  /** Queues the screenshot for OCR + extraction again. */
+  reprocess(id: string): Promise<unknown>;
+  /** Removes it from the app index (not from the gallery). */
+  remove(id: string): Promise<boolean>;
+  /** Called whenever the library changes (e.g. the pipeline finished this screenshot). */
+  subscribe(listener: () => void): () => void;
 };
 
 async function fetchDetail(deps: DetailDeps, id: string) {
@@ -17,12 +23,16 @@ async function fetchDetail(deps: DetailDeps, id: string) {
   return { record, entities };
 }
 
-/** Loads one screenshot with its entities and performs the tap actions. */
+/** Loads one screenshot with its entities, keeps it fresh and performs the actions. */
 export function useScreenshotDetail(id: string, deps: DetailDeps, strings: Strings) {
   const [loading, setLoading] = useState(true);
   const [record, setRecord] = useState<ScreenshotRecord | null>(null);
   const [entities, setEntities] = useState<StoredEntity[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Bumped to reload: after an action, or when the library reports a change.
+  const [version, setVersion] = useState(0);
+
+  useEffect(() => deps.subscribe(() => setVersion((v) => v + 1)), [deps]);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,7 +52,7 @@ export function useScreenshotDetail(id: string, deps: DetailDeps, strings: Strin
     return () => {
       cancelled = true;
     };
-  }, [deps, id, strings]);
+  }, [deps, id, strings, version]);
 
   const press = useCallback(
     async (entity: StoredEntity) => {
@@ -54,14 +64,23 @@ export function useScreenshotDetail(id: string, deps: DetailDeps, strings: Strin
         } else if (entity.type === 'task') {
           const repo = await deps.getRepository();
           await repo.setTaskDone(entity.id, !entity.extra.done);
-          setEntities((await fetchDetail(deps, id)).entities);
+          setVersion((v) => v + 1);
         }
       } catch {
         setError(strings.openFailed(entity.value));
       }
     },
-    [deps, id, strings],
+    [deps, strings],
   );
 
-  return { loading, record, entities, error, press };
+  const reprocess = useCallback(async () => {
+    setError(null);
+    await deps.reprocess(id);
+    setVersion((v) => v + 1);
+  }, [deps, id]);
+
+  /** Resolves to true when the screenshot is gone from the index. */
+  const remove = useCallback(() => deps.remove(id), [deps, id]);
+
+  return { loading, record, entities, error, press, reprocess, remove };
 }

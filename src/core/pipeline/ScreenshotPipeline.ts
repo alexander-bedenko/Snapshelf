@@ -25,7 +25,7 @@ export type PipelineOptions = {
 export type SyncResult =
   | { status: 'no-permission'; permission: PermissionState }
   | { status: 'empty' }
-  | { status: 'ok'; found: number; inserted: number };
+  | { status: 'ok'; found: number; inserted: number; pruned: number };
 
 export type ProcessResult = { done: number; failed: number };
 
@@ -87,11 +87,14 @@ export class ScreenshotPipeline {
       }
       throw error;
     }
+    // An empty list is not used to prune: a glitch in the media query must not wipe the index.
     if (refs.length === 0) return { status: 'empty' };
 
     const inserted = await this.deps.repo.upsertDiscovered(refs);
+    // Screenshots deleted from the gallery leave the index too (this is a full listing).
+    const pruned = await this.deps.repo.pruneMissing(refs.map((r) => r.id));
     this.emit();
-    return { status: 'ok', found: refs.length, inserted };
+    return { status: 'ok', found: refs.length, inserted, pruned };
   }
 
   /**

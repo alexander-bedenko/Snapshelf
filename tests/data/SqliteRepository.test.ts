@@ -279,3 +279,90 @@ describe('SqliteRepository: entities', () => {
     expect(await repo.setTaskDone(9999, true)).toBe(false);
   });
 });
+
+describe('SqliteRepository: reprocess, remove, restore (M5)', () => {
+  async function library() {
+    const { repo, db } = await openTestRepo();
+    await repo.upsertDiscovered(refs(4));
+    await repo.claimBatch(4, 0, MAX); // all four processing, attempts = 1
+    await repo.markProcessed('s1', {
+      ocrText: 'one',
+      topic: null,
+      processedAt: 1,
+      entities: [{ type: 'email', value: 'a@b.co', normalized: 'a@b.co' }],
+    });
+    await repo.markProcessed('s2', { ocrText: 'two', topic: null, processedAt: 1 });
+    await repo.markFailed('s3', 'boom', null);
+    // s4 stays `processing`
+    return { repo, db };
+  }
+
+  it('requeues done and failed rows with fresh attempts, never in-flight ones', async () => {
+    const { repo } = await library();
+
+    expect(await repo.requeue('failed')).toBe(1);
+    expect(await repo.getById('s3')).toMatchObject({
+      status: 'pending',
+      attempts: 0,
+      error: null,
+      nextRetryAt: null,
+    });
+
+    expect(await repo.requeue({ ids: ['s1', 's4', 'missing'] })).toBe(1);
+    expect(await repo.getById('s1')).toMatchObject({ status: 'pending', ocrText: 'one' });
+    expect((await repo.getById('s4'))?.status).toBe('processing');
+
+    expect(await repo.requeue('all')).toBe(1); // only s2 was still done
+    expect(await repo.countByStatus()).toEqual({ pending: 3, processing: 1, done: 0, failed: 0 });
+  });
+
+  it('removes a screenshot with its text and entities and remembers it', async () => {
+    const { repo, db } = await library();
+
+    expect(await repo.removeFromIndex('s1', 99)).toBe(true);
+    expect(await repo.removeFromIndex('s1', 100)).toBe(false);
+
+    expect(await repo.getById('s1')).toBeNull();
+    expect(await repo.getEntities('s1')).toEqual([]);
+    expect(await repo.search('one')).toEqual([]);
+    expect(await repo.countRemoved()).toBe(1);
+    expect(await db.all('SELECT id, removed_at FROM removed_screenshots')).toEqual([
+      { id: 's1', removed_at: 99 },
+    ]);
+
+    expect(await repo.upsertDiscovered([ref(1)])).toBe(0);
+    expect(await repo.getById('s1')).toBeNull();
+  });
+
+  it('restores removed screenshots so the next scan adds them again', async () => {
+    const { repo } = await library();
+    await repo.removeFromIndex('s1', 1);
+    await repo.removeFromIndex('s2', 1);
+
+    expect(await repo.restoreRemoved()).toBe(2);
+    expect(await repo.countRemoved()).toBe(0);
+    expect(await repo.upsertDiscovered([ref(1)])).toBe(1);
+    expect((await repo.getById('s1'))?.status).toBe('pending');
+  });
+
+  it('prunes screenshots and removals that are gone from the gallery', async () => {
+    const { repo, db } = await library();
+    await repo.removeFromIndex('s2', 1);
+
+    expect(await repo.pruneMissing(['s1', 's4'])).toBe(1); // s3 dropped; s2 was already removed
+    expect((await repo.list()).map((r) => r.id).sort()).toEqual(['s1', 's4']);
+    expect(await repo.countRemoved()).toBe(0);
+    expect(await db.all('SELECT id FROM entities')).toHaveLength(1); // s1's email stays
+  });
+
+  it('handles more ids than SQLite allows in one statement', async () => {
+    const { repo } = await openTestRepo();
+    const many = Array.from({ length: 1200 }, (_, i) => ref(i + 1));
+    await repo.upsertDiscovered(many);
+    await repo.claimBatch(1200, 0, MAX);
+    for (const r of many) await repo.markFailed(r.id, 'x', null);
+
+    expect(await repo.requeue({ ids: many.map((r) => r.id) })).toBe(1200);
+    expect(await repo.pruneMissing(many.slice(0, 100).map((r) => r.id))).toBe(1100);
+  }, 30000);
+});

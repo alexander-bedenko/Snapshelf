@@ -3,6 +3,7 @@ import type {
   ListOptions,
   ProcessedResult,
   Repository,
+  RequeueTarget,
   SearchOptions,
   StoredEntity,
 } from '@/core/repository';
@@ -70,6 +71,13 @@ function toRecord(row: Row): ScreenshotRecord {
   };
 }
 
+/** Splits ids so a statement stays far below SQLite's bound-parameter limit. */
+function chunks<T>(items: T[], size = 500): T[][] {
+  const result: T[][] = [];
+  for (let i = 0; i < items.length; i += size) result.push(items.slice(i, i + size));
+  return result;
+}
+
 export class SqliteRepository implements Repository {
   constructor(private readonly db: SqlDb) {}
 
@@ -80,8 +88,9 @@ export class SqliteRepository implements Repository {
       for (const ref of refs) {
         const { changes } = await tx.run(
           `INSERT OR IGNORE INTO screenshots (id, uri, taken_at, width, height, status)
-           VALUES (?, ?, ?, ?, ?, 'pending')`,
-          [ref.id, ref.uri, ref.takenAt, ref.width, ref.height],
+           SELECT ?, ?, ?, ?, ?, 'pending'
+           WHERE NOT EXISTS (SELECT 1 FROM removed_screenshots WHERE id = ?)`,
+          [ref.id, ref.uri, ref.takenAt, ref.width, ref.height, ref.id],
         );
         inserted += changes;
       }
@@ -163,13 +172,15 @@ export class SqliteRepository implements Repository {
     await this.db.transaction(async (tx) => {
       // Entities are rebuilt from scratch so reprocessing stays idempotent.
       await tx.run('DELETE FROM entities WHERE screenshot_id = ?', [id]);
-      await tx.run(
+      const { changes } = await tx.run(
         `UPDATE screenshots
          SET status = 'done', ocr_text = ?, search_text = ?, topic = ?, processed_at = ?,
              error = NULL, next_retry_at = NULL
          WHERE id = ?`,
         [result.ocrText, foldForSearch(result.ocrText), result.topic, result.processedAt, id],
       );
+      // Removed or pruned while OCR was running: nothing to write.
+      if (changes === 0) return;
       for (const entity of result.entities ?? []) {
         await tx.run(
           `INSERT INTO entities (screenshot_id, type, value, normalized, extra)
@@ -213,6 +224,65 @@ export class SqliteRepository implements Repository {
       `UPDATE screenshots SET status = 'failed', error = ?, next_retry_at = ? WHERE id = ?`,
       [error, nextRetryAt, id],
     );
+  }
+
+  async requeue(target: RequeueTarget): Promise<number> {
+    const base = `UPDATE screenshots
+      SET status = 'pending', attempts = 0, next_retry_at = NULL, error = NULL`;
+    if (target === 'all') {
+      return (await this.db.run(`${base} WHERE status IN ('done', 'failed')`)).changes;
+    }
+    if (target === 'failed') {
+      return (await this.db.run(`${base} WHERE status = 'failed'`)).changes;
+    }
+    let total = 0;
+    for (const ids of chunks(target.ids)) {
+      const marks = ids.map(() => '?').join(', ');
+      total += (
+        await this.db.run(`${base} WHERE status IN ('done', 'failed') AND id IN (${marks})`, ids)
+      ).changes;
+    }
+    return total;
+  }
+
+  async removeFromIndex(id: string, now: number): Promise<boolean> {
+    return this.db.transaction(async (tx) => {
+      const { changes } = await tx.run('DELETE FROM screenshots WHERE id = ?', [id]);
+      if (changes === 0) return false;
+      await tx.run('INSERT OR REPLACE INTO removed_screenshots (id, removed_at) VALUES (?, ?)', [
+        id,
+        now,
+      ]);
+      return true;
+    });
+  }
+
+  async restoreRemoved(): Promise<number> {
+    return (await this.db.run('DELETE FROM removed_screenshots')).changes;
+  }
+
+  async countRemoved(): Promise<number> {
+    const [row] = await this.db.all<{ n: number }>('SELECT COUNT(*) AS n FROM removed_screenshots');
+    return row?.n ?? 0;
+  }
+
+  async pruneMissing(presentIds: string[]): Promise<number> {
+    const present = new Set(presentIds);
+    return this.db.transaction(async (tx) => {
+      const indexed = await tx.all<{ id: string }>('SELECT id FROM screenshots');
+      const removed = await tx.all<{ id: string }>('SELECT id FROM removed_screenshots');
+      const goneIndexed = indexed.map((r) => r.id).filter((id) => !present.has(id));
+      const goneRemoved = removed.map((r) => r.id).filter((id) => !present.has(id));
+      for (const ids of chunks(goneIndexed)) {
+        const marks = ids.map(() => '?').join(', ');
+        await tx.run(`DELETE FROM screenshots WHERE id IN (${marks})`, ids);
+      }
+      for (const ids of chunks(goneRemoved)) {
+        const marks = ids.map(() => '?').join(', ');
+        await tx.run(`DELETE FROM removed_screenshots WHERE id IN (${marks})`, ids);
+      }
+      return goneIndexed.length;
+    });
   }
 
   async recoverInterrupted(maxAttempts: number): Promise<number> {

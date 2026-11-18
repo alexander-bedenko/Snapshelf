@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -19,7 +20,12 @@ export type ScreenshotDetailProps = {
   record: ScreenshotRecord | null;
   entities: StoredEntity[];
   error: string | null;
-  actions: { press(entity: StoredEntity): void; back(): void };
+  actions: {
+    press(entity: StoredEntity): void;
+    back(): void;
+    reprocess(): void;
+    remove(): void;
+  };
   strings: Strings;
 };
 
@@ -60,6 +66,24 @@ function EntityRow({
   );
 }
 
+function Action({
+  label,
+  onPress,
+  testID,
+  danger,
+}: {
+  label: string;
+  onPress(): void;
+  testID: string;
+  danger?: boolean;
+}) {
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={styles.action} testID={testID}>
+      <Text style={[styles.actionText, danger && styles.danger]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 export function ScreenshotDetailScreen({
   loading,
   record,
@@ -68,6 +92,8 @@ export function ScreenshotDetailScreen({
   actions,
   strings,
 }: ScreenshotDetailProps) {
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const busy = record?.status === 'pending' || record?.status === 'processing';
   return (
     <ScrollView contentContainerStyle={styles.container} testID="screenshot-detail">
       <Pressable accessibilityRole="button" onPress={actions.back} testID="back">
@@ -93,6 +119,17 @@ export function ScreenshotDetailScreen({
               },
             ]}
           />
+          {busy ? (
+            <View style={styles.statusRow} testID="detail-busy">
+              <ActivityIndicator />
+              <Text style={styles.body}>{strings.status[record.status]}</Text>
+            </View>
+          ) : null}
+          {record.status === 'failed' ? (
+            <Text style={styles.error} testID="detail-failed">
+              {strings.status.failed}: {record.error}
+            </Text>
+          ) : null}
           <Text style={styles.heading}>{strings.foundTitle}</Text>
           {entities.length === 0 ? (
             <Text style={styles.body} testID="nothing-found">
@@ -118,6 +155,34 @@ export function ScreenshotDetailScreen({
               </Text>
             </>
           ) : null}
+          <View style={styles.actions}>
+            {busy ? null : (
+              <Action label={strings.reprocess} onPress={actions.reprocess} testID="reprocess" />
+            )}
+            {confirmRemove ? (
+              <View style={styles.confirm} testID="remove-confirmation">
+                <Text style={styles.body}>{strings.removeConfirmBody}</Text>
+                <Action
+                  danger
+                  label={strings.removeConfirm}
+                  onPress={actions.remove}
+                  testID="confirm-remove"
+                />
+                <Action
+                  label={strings.cancel}
+                  onPress={() => setConfirmRemove(false)}
+                  testID="cancel-remove"
+                />
+              </View>
+            ) : (
+              <Action
+                danger
+                label={strings.removeFromApp}
+                onPress={() => setConfirmRemove(true)}
+                testID="remove"
+              />
+            )}
+          </View>
         </>
       )}
     </ScrollView>
@@ -137,4 +202,10 @@ const styles = StyleSheet.create({
   entityValue: { fontSize: 16, color: '#222', flexShrink: 1 },
   check: { fontSize: 20 },
   done: { textDecorationLine: 'line-through', color: '#888' },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  actions: { marginTop: 24, gap: 4 },
+  action: { paddingVertical: 12 },
+  actionText: { fontSize: 16, color: '#208AEF' },
+  danger: { color: '#b00020' },
+  confirm: { backgroundColor: '#f2f4f8', borderRadius: 12, padding: 12, gap: 4 },
 });

@@ -9,6 +9,35 @@
   `ANDROID_AVD_HOME=D:\Android\avd`, WHPX acceleration). JDK 17 and Android SDK installed in M1.
 - Not macOS: iOS cannot be built here.
 
+## Milestone: M5 (polish, reprocess, remove from index) — DONE in Jest; NOT run on the emulator
+
+### Verified (commands run, Linux VM, Node 22.23.4)
+
+- `npm run check` — **239 tests in 22 suites** pass (twice); `npm run format:check` passes;
+  `npx expo export --platform android` builds the bundle with the new `/settings` route.
+- Schema v4 (`removed_screenshots`, approved by the user): built from empty and upgraded from v3 with data.
+- Reprocess: one screenshot (detail screen), all, or only failed (settings). Rows being processed are never
+  re-queued; attempts reset; the new OCR text and entities replace the old ones (also fills entities for
+  screenshots processed before M4).
+- Remove from Snapshelf (detail screen, inline confirmation saying the photo stays in the gallery): the row, its
+  text (FTS) and entities go; the id is remembered, so gallery scans and the ContentObserver skip it; settings can
+  bring all removed screenshots back (runs a scan).
+- Screenshots deleted from the gallery are dropped from the index on the next full scan; an empty scan never
+  prunes (guard against a failing media query). A screenshot removed or pruned while its OCR runs is skipped
+  without errors.
+- States: detail shows "reading…" while queued/processing and refreshes when the library reports the result,
+  and the error of a failed screenshot; settings shows loading, processing, errors and the result of each action;
+  actions with nothing to do are disabled. Library has a link to settings. ru plurals checked.
+- Mutation checks: dropping the removed-id check in `upsertDiscovered` fails 3 tests; writing results for a
+  removed screenshot fails the "removed while OCR is running" test.
+
+### NOT verified / known gaps
+
+- Nothing of M5 was run on the emulator (the local run stopped before checks, see M1 below).
+- If every screenshot is deleted from the gallery, the index keeps them (empty scans do not prune).
+- Settings has no language switch or OCR engine choice; UI language follows the device.
+- `e2e/` has no flow for reprocess/remove yet.
+
 ## Milestone: M4 (extraction + "found items") — LOGIC AND UI DONE in Jest; NOT run on the emulator; Maestro NOT run
 
 Started on the user's decision (2026-11-18) while M1 (Tesseract build + CER) and M3 (on-device check) still wait for
@@ -256,4 +285,5 @@ npm run ocr:accuracy -- --adb --engine routed    # after OCR_SPIKE_DONE appears 
 2. Verify M3 on the emulator (search in the app, v2 → v3 migration on the old DB).
 3. On Windows: verify M4 on the emulator (open a screenshot, tap link/email/phone/date/task), install Maestro and
    run `npm run e2e:android`; then M4 is done.
-4. M5: polish, error states, settings, reprocess action (also fills entities for pre-M4 screenshots).
+4. On Windows: check M5 on the emulator (reprocess, remove/restore, settings).
+5. M6: iOS (needs macOS + Xcode) — or M7 (semantic search) if iOS waits.

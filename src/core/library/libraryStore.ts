@@ -1,6 +1,6 @@
 import { createStore, type StoreApi } from 'zustand/vanilla';
 
-import type { Repository } from '@/core/repository';
+import type { Repository, RequeueTarget } from '@/core/repository';
 import type { PermissionState, ScreenshotRecord, ScreenshotStatus } from '@/core/types';
 import type { ScreenshotSource } from '@/platform/media/ScreenshotSource';
 
@@ -16,6 +16,8 @@ export type LibraryState = {
   /** `true` when the last sync found no screenshots on the device. */
   deviceEmpty: boolean;
   counts: Record<ScreenshotStatus, number>;
+  /** Screenshots the user removed from the index (the photos stay in the gallery). */
+  removedCount: number;
   items: ScreenshotRecord[];
   error: string | null;
   /** Current search input, as typed. */
@@ -28,6 +30,12 @@ export type LibraryState = {
   setQuery(query: string): void;
   requestPermission(): Promise<void>;
   refresh(): Promise<void>;
+  /** Processes screenshots again (e.g. after an OCR update, or to retry failures). Returns how many. */
+  reprocess(target: RequeueTarget): Promise<number>;
+  /** Removes a screenshot from the app index without touching the photo. */
+  remove(id: string): Promise<boolean>;
+  /** Brings removed screenshots back on the next gallery scan (runs one now). Returns how many. */
+  restoreRemoved(): Promise<number>;
   /** Call when the app returns to the foreground (e.g. after the user visited system settings). */
   onForeground(): Promise<void>;
   dispose(): void;
@@ -42,6 +50,7 @@ export type LibraryDeps = {
   listLimit?: number;
   /** Trailing throttle for DB reloads while the pipeline is busy. */
   reloadDelayMs?: number;
+  now?: () => number;
   /** Debounce between keystrokes and the search query. */
   searchDelayMs?: number;
   searchLimit?: number;
@@ -60,6 +69,7 @@ export function createLibraryStore(deps: LibraryDeps): LibraryStore {
   const reloadDelayMs = deps.reloadDelayMs ?? 250;
   const searchDelayMs = deps.searchDelayMs ?? 150;
   const searchLimit = deps.searchLimit ?? 100;
+  const now = deps.now ?? Date.now;
   let unwatch: (() => void) | null = null;
   let reloadTimer: ReturnType<typeof setTimeout> | undefined;
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
@@ -74,6 +84,7 @@ export function createLibraryStore(deps: LibraryDeps): LibraryStore {
     processing: false,
     deviceEmpty: false,
     counts: EMPTY_COUNTS,
+    removedCount: 0,
     items: [],
     error: null,
     query: '',
@@ -83,6 +94,9 @@ export function createLibraryStore(deps: LibraryDeps): LibraryStore {
     setQuery,
     requestPermission,
     refresh,
+    reprocess,
+    remove,
+    restoreRemoved,
     onForeground,
     dispose,
   }));
@@ -95,11 +109,12 @@ export function createLibraryStore(deps: LibraryDeps): LibraryStore {
   }
 
   async function reload() {
-    const [counts, items] = await Promise.all([
+    const [counts, items, removedCount] = await Promise.all([
       repo.countByStatus(),
       repo.list({ limit: listLimit }),
+      repo.countRemoved(),
     ]);
-    if (!disposed) set({ counts, items });
+    if (!disposed) set({ counts, items, removedCount });
     // Newly processed screenshots may match the active search.
     if (store.getState().results !== null) await runSearch();
   }
@@ -199,6 +214,41 @@ export function createLibraryStore(deps: LibraryDeps): LibraryStore {
   async function refresh() {
     if (store.getState().permission !== 'granted') return;
     await syncAndProcess();
+  }
+
+  async function reprocess(target: RequeueTarget) {
+    try {
+      const count = await repo.requeue(target);
+      await reload();
+      if (count > 0) void startProcessing();
+      return count;
+    } catch (error) {
+      fail(error);
+      return 0;
+    }
+  }
+
+  async function remove(id: string) {
+    try {
+      const removed = await repo.removeFromIndex(id, now());
+      await reload();
+      return removed;
+    } catch (error) {
+      fail(error);
+      return false;
+    }
+  }
+
+  async function restoreRemoved() {
+    try {
+      const count = await repo.restoreRemoved();
+      await reload();
+      if (count > 0 && store.getState().permission === 'granted') await syncAndProcess();
+      return count;
+    } catch (error) {
+      fail(error);
+      return 0;
+    }
   }
 
   async function onForeground() {

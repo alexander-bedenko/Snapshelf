@@ -29,6 +29,7 @@ function Connected({ store }: { store: LibraryStore }) {
         openSettings: openAppSettings,
         setQuery: state.setQuery,
         openScreenshot: (id) => router.push({ pathname: '/screenshot/[id]', params: { id } }),
+        openSettingsScreen: () => router.push('/settings'),
       }}
       strings={strings}
     />

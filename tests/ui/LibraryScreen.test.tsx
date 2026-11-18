@@ -33,6 +33,7 @@ async function setup(state: Partial<LibraryScreenProps['state']> = {}, strings =
     openSettings: jest.fn(),
     setQuery: jest.fn(),
     openScreenshot: jest.fn(),
+    openSettingsScreen: jest.fn(),
   };
   const props: LibraryScreenProps = {
     state: {
@@ -224,5 +225,13 @@ describe('LibraryScreen', () => {
     fireEvent.press(screen.getByTestId('row-s7'));
 
     expect(actions.openScreenshot).toHaveBeenCalledWith('s7');
+  });
+
+  it('opens the settings screen', async () => {
+    const { actions } = await setup();
+
+    fireEvent.press(screen.getByTestId('settings-link'));
+
+    expect(actions.openSettingsScreen).toHaveBeenCalledTimes(1);
   });
 });

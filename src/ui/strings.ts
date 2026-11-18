@@ -30,6 +30,21 @@ export type Strings = {
   taskOpen: string;
   openFailed: (target: string) => string;
   foundCount: (count: number) => string;
+  reprocess: string;
+  removeFromApp: string;
+  removeConfirmBody: string;
+  removeConfirm: string;
+  cancel: string;
+  settings: string;
+  settingsTitle: string;
+  libraryStats: (counts: { total: number; done: number; failed: number; queued: number }) => string;
+  removedStats: (count: number) => string;
+  retryFailed: (count: number) => string;
+  reprocessAll: string;
+  reprocessAllBody: string;
+  restoreRemoved: (count: number) => string;
+  queued: (count: number) => string;
+  privacyNote: string;
 };
 
 function ruPlural(n: number, one: string, few: string, many: string): string {
@@ -73,6 +88,27 @@ const en: Strings = {
   taskOpen: 'Not done',
   openFailed: (target) => `Could not open ${target}`,
   foundCount: (count) => (count === 1 ? '1 item found' : `${count} items found`),
+  reprocess: 'Read again',
+  removeFromApp: 'Remove from Snapshelf',
+  removeConfirmBody:
+    'The screenshot leaves Snapshelf with its text and found items. The photo stays in your gallery.',
+  removeConfirm: 'Remove',
+  cancel: 'Cancel',
+  settings: 'Settings',
+  settingsTitle: 'Settings',
+  libraryStats: ({ total, done, failed, queued }) =>
+    `${total} screenshots: ${done} done, ${failed} failed, ${queued} waiting`,
+  removedStats: (count) =>
+    count === 1
+      ? '1 screenshot removed from Snapshelf'
+      : `${count} screenshots removed from Snapshelf`,
+  retryFailed: (count) => `Retry failed (${count})`,
+  reprocessAll: 'Read all screenshots again',
+  reprocessAllBody:
+    'Recognizes the text of every screenshot again and refreshes found items. It can take a while.',
+  restoreRemoved: (count) => `Bring back removed screenshots (${count})`,
+  queued: (count) => (count === 1 ? '1 screenshot queued' : `${count} screenshots queued`),
+  privacyNote: 'Text is recognized on this device. Nothing is uploaded.',
 };
 
 const ru: Strings = {
@@ -110,6 +146,26 @@ const ru: Strings = {
   openFailed: (target) => `Не удалось открыть ${target}`,
   foundCount: (count) =>
     `${ruPlural(count, 'Найден', 'Найдено', 'Найдено')} ${count} ${ruPlural(count, 'элемент', 'элемента', 'элементов')}`,
+  reprocess: 'Прочитать заново',
+  removeFromApp: 'Убрать из Snapshelf',
+  removeConfirmBody:
+    'Скриншот пропадёт из Snapshelf вместе с текстом и найденным. Фото останется в галерее.',
+  removeConfirm: 'Убрать',
+  cancel: 'Отмена',
+  settings: 'Настройки',
+  settingsTitle: 'Настройки',
+  libraryStats: ({ total, done, failed, queued }) =>
+    `${total} ${ruPlural(total, 'скриншот', 'скриншота', 'скриншотов')}: готово ${done}, ошибок ${failed}, в очереди ${queued}`,
+  removedStats: (count) =>
+    `${ruPlural(count, 'Убран', 'Убрано', 'Убрано')} из Snapshelf: ${count} ${ruPlural(count, 'скриншот', 'скриншота', 'скриншотов')}`,
+  retryFailed: (count) => `Повторить с ошибками (${count})`,
+  reprocessAll: 'Прочитать все скриншоты заново',
+  reprocessAllBody:
+    'Текст всех скриншотов будет распознан заново, найденное обновится. Это может занять время.',
+  restoreRemoved: (count) => `Вернуть убранные скриншоты (${count})`,
+  queued: (count) =>
+    `${ruPlural(count, 'Поставлен', 'Поставлено', 'Поставлено')} в очередь: ${count}`,
+  privacyNote: 'Текст распознаётся на устройстве. Ничего не отправляется.',
 };
 
 export function getStrings(locale: string): Strings {

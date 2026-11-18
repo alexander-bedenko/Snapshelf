@@ -320,3 +320,70 @@ describe('library store: search', () => {
     await waitFor(() => store.getState().results?.length === 2);
   });
 });
+
+describe('library store: reprocess, remove, restore (M5)', () => {
+  const uri = (n: number) => `content://media/external/images/media/${n}`;
+
+  async function ready(count: number) {
+    const source = new FakeScreenshotSource({ screenshots: refs(count) });
+    const ctx = await setup(source);
+    await ctx.store.getState().init();
+    await waitFor(
+      () => ctx.store.getState().counts.done === count && !ctx.store.getState().processing,
+    );
+    return ctx;
+  }
+
+  it('reprocesses one screenshot with the current OCR result and extraction', async () => {
+    const { store, ocr, repo } = await ready(2);
+    ocr.setText(uri(1), 'new text a@b.co');
+
+    expect(await store.getState().reprocess({ ids: ['s1'] })).toBe(1);
+
+    await waitFor(async () => (await repo.getById('s1'))?.ocrText === 'new text a@b.co');
+    expect((await repo.getEntities('s1')).map((e) => e.type)).toEqual(['email']);
+    await waitFor(() => store.getState().counts.done === 2 && !store.getState().processing);
+  });
+
+  it('retries failed screenshots and reports how many were queued', async () => {
+    const source = new FakeScreenshotSource({ screenshots: refs(2) });
+    const { store, ocr } = await setup(source);
+    ocr.failWith(uri(2), 'bad image');
+    await store.getState().init();
+    await waitFor(() => store.getState().counts.failed === 1 && !store.getState().processing);
+
+    ocr.clearFailure(uri(2));
+    expect(await store.getState().reprocess('failed')).toBe(1);
+
+    await waitFor(() => store.getState().counts.done === 2);
+  });
+
+  it('removes a screenshot from the list and keeps it out after a rescan', async () => {
+    const { store } = await ready(3);
+
+    expect(await store.getState().remove('s2')).toBe(true);
+    expect(store.getState().items.map((r) => r.id)).toEqual(['s3', 's1']);
+    expect(store.getState().removedCount).toBe(1);
+
+    await store.getState().refresh();
+    expect(store.getState().items.map((r) => r.id)).toEqual(['s3', 's1']);
+  });
+
+  it('restores removed screenshots and processes them again', async () => {
+    const { store } = await ready(2);
+    await store.getState().remove('s1');
+
+    expect(await store.getState().restoreRemoved()).toBe(1);
+
+    expect(store.getState().removedCount).toBe(0);
+    await waitFor(() => store.getState().counts.done === 2);
+  });
+
+  it('turns repository failures into an error message', async () => {
+    const { store, repo } = await ready(1);
+    jest.spyOn(repo, 'removeFromIndex').mockRejectedValueOnce(new Error('disk full'));
+
+    expect(await store.getState().remove('s1')).toBe(false);
+    expect(store.getState().error).toBe('disk full');
+  });
+});

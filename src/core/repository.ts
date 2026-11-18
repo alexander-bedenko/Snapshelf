@@ -22,15 +22,24 @@ export type SearchOptions = {
   limit?: number;
 };
 
+/** Which screenshots to process again. Rows being processed right now are never touched. */
+export type RequeueTarget = { ids: string[] } | 'all' | 'failed';
+
 export interface Repository {
-  /** Inserts unknown screenshots as `pending`; never touches existing rows. Returns inserted count. */
+  /**
+   * Inserts unknown screenshots as `pending`; never touches existing rows and skips screenshots the
+   * user removed from the index. Returns inserted count.
+   */
   upsertDiscovered(refs: ScreenshotRef[]): Promise<number>;
   getById(id: string): Promise<ScreenshotRecord | null>;
   list(options?: ListOptions): Promise<ScreenshotRecord[]>;
   countByStatus(): Promise<Record<ScreenshotStatus, number>>;
   /** Atomically moves due `pending`/`failed` rows to `processing` and counts the attempt. */
   claimBatch(limit: number, now: number, maxAttempts: number): Promise<ScreenshotRecord[]>;
-  /** Writes the result (text, entities) and marks the row `done` in one transaction. */
+  /**
+   * Writes the result (text, entities) and marks the row `done` in one transaction. Does nothing
+   * if the screenshot was removed or pruned while it was being processed.
+   */
   markProcessed(id: string, result: ProcessedResult): Promise<void>;
   /** `nextRetryAt = null` means no more automatic retries. */
   markFailed(id: string, error: string, nextRetryAt: number | null): Promise<void>;
@@ -44,6 +53,21 @@ export interface Repository {
    * Returns `[]` for a query without words.
    */
   search(query: string, options?: SearchOptions): Promise<ScreenshotRecord[]>;
+  /** Puts finished/failed screenshots back in the queue with fresh attempts. Returns how many. */
+  requeue(target: RequeueTarget): Promise<number>;
+  /**
+   * Removes a screenshot (and its text and entities) from the app index and remembers its id so
+   * gallery scans skip it. The photo itself is not touched. Returns false if it was not indexed.
+   */
+  removeFromIndex(id: string, now: number): Promise<boolean>;
+  /** Forgets all removals; the next gallery scan adds those screenshots again. Returns how many. */
+  restoreRemoved(): Promise<number>;
+  countRemoved(): Promise<number>;
+  /**
+   * Drops indexed and removed screenshots whose ids are not in `presentIds` (deleted from the
+   * gallery). Returns how many indexed screenshots were dropped.
+   */
+  pruneMissing(presentIds: string[]): Promise<number>;
   /** After a crash/kill: `processing` rows go back to `pending` (or `failed` if out of attempts). */
   recoverInterrupted(maxAttempts: number): Promise<number>;
 }

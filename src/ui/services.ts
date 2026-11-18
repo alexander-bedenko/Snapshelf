@@ -5,6 +5,8 @@ import { ScreenshotPipeline } from '@/core/pipeline/ScreenshotPipeline';
 import { openRepository } from '@/data/openRepository';
 import { createAndroidScreenshotSource } from '@/platform/media/android/createAndroidScreenshotSource';
 import { MlKitLatinOcrEngine } from '@/platform/ocr/android/MlKitLatinOcrEngine';
+import { TesseractOcrEngine } from '@/platform/ocr/android/TesseractOcrEngine';
+import { ScriptRoutingOcrEngine } from '@/platform/ocr/ScriptRoutingOcrEngine';
 
 let pending: Promise<LibraryStore> | null = null;
 
@@ -14,7 +16,12 @@ export function getLibraryStore(): Promise<LibraryStore> {
     const repo = await openRepository();
     const source = createAndroidScreenshotSource();
     const pipeline = new ScreenshotPipeline(
-      { source, ocr: new MlKitLatinOcrEngine(), repo },
+      {
+        source,
+        // Tesseract reads Cyrillic; ML Kit stays the engine for en/pl (see DECISIONS.md, M1).
+        ocr: new ScriptRoutingOcrEngine(new TesseractOcrEngine(), new MlKitLatinOcrEngine()),
+        repo,
+      },
       { onError: (error) => console.warn('pipeline error', String(error)) },
     );
     return createLibraryStore({ source, repo, pipeline });

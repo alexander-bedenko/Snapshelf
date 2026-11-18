@@ -5,6 +5,8 @@ const {
   characterErrors,
   languageOf,
   summarize,
+  parseLog,
+  selectRun,
 } = require('./accuracy');
 
 describe('ocr accuracy', () => {
@@ -42,5 +44,39 @@ describe('ocr accuracy', () => {
     expect(s.ru.cer).toBeCloseTo(0.05);
     expect(s.ru.count).toBe(2);
     expect(s.en.cer).toBe(0);
+  });
+});
+
+describe('ocr log parsing', () => {
+  const log = [
+    'I ReactNativeJS: OCR_SPIKE {"name":"ru-notes","run":"tesseract","engine":"tesseract","text":"a"}',
+    'I ReactNativeJS: OCR_SPIKE {"name":"ru-notes","run":"mlkit-latin","engine":"mlkit-latin","text":"b"}',
+    'I ReactNativeJS: OCR_SPIKE {"name":"ru-notes","run":"routed","engine":"tesseract","text":"c"}',
+    'I ReactNativeJS: OCR_SPIKE {"name":"en-article","run":"routed","error":"boom"}',
+    'I ReactNativeJS: OCR_SPIKE {"name":"truncated","run":"rou',
+    'I ReactNativeJS: OCR_SPIKE_DONE',
+  ].join('\n');
+
+  it('keeps one item per run and fixture', () => {
+    expect(parseLog(log)).toHaveLength(4);
+  });
+
+  it('selects a run by its id, not by the engine that answered', () => {
+    const routed = selectRun(parseLog(log), 'routed');
+    expect(routed.id).toBe('routed');
+    expect(routed.items.map((i) => i.text ?? i.error)).toEqual(['c', 'boom']);
+  });
+
+  it('asks for --engine when several runs are present', () => {
+    expect(selectRun(parseLog(log)).error).toMatch(/several runs/);
+    expect(selectRun(parseLog(log), 'nope').error).toMatch(/no results/);
+  });
+
+  it('reads old single-engine results without a run id', () => {
+    const old = [
+      { name: 'ru-notes', engine: 'mlkit-latin', text: 'x' },
+      { name: 'en-article', error: 'boom' },
+    ];
+    expect(selectRun(old)).toMatchObject({ id: 'mlkit-latin', items: old });
   });
 });

@@ -4,12 +4,13 @@
 //   npm run ocr:accuracy -- --log logcat.txt      parse OCR_SPIKE lines from a saved logcat
 //   npm run ocr:accuracy -- --adb                 read `adb logcat -d` directly
 //   npm run ocr:accuracy -- --results file.json   re-score a file saved in tests/ocr-accuracy/results
+//   add --engine <run id> (mlkit-latin | tesseract | routed) when the log holds several runs
 // Exits with code 1 if any language is above the threshold (CLAUDE.md section 7: CER <= 10%).
 
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const { characterErrors, summarize } = require('./accuracy');
+const { characterErrors, parseLog, selectRun, summarize } = require('./accuracy');
 
 const THRESHOLD = 0.1;
 const LANGUAGES = ['ru', 'en', 'pl'];
@@ -19,21 +20,6 @@ const RESULTS_DIR = path.join(__dirname, 'results');
 function arg(name) {
   const i = process.argv.indexOf(name);
   return i === -1 ? undefined : (process.argv[i + 1] ?? true);
-}
-
-function parseLog(text) {
-  const byName = new Map();
-  for (const line of text.split(/\r?\n/)) {
-    const at = line.indexOf('OCR_SPIKE {');
-    if (at === -1) continue;
-    try {
-      const item = JSON.parse(line.slice(at + 'OCR_SPIKE '.length));
-      byName.set(item.name, item);
-    } catch {
-      // truncated logcat line: ignore, the fixture is reported as missing
-    }
-  }
-  return [...byName.values()];
 }
 
 function load() {
@@ -46,11 +32,18 @@ function load() {
   return null;
 }
 
-const results = load();
-if (!results) {
+const loaded = load();
+if (!loaded) {
   console.log('ocr:accuracy: pass --log <file>, --adb or --results <file>. See docs/STATUS.md.');
   process.exit(0);
 }
+const wanted = typeof arg('--engine') === 'string' ? arg('--engine') : undefined;
+const selection = selectRun(loaded, wanted);
+if (selection.error) {
+  console.log(`ocr:accuracy: ${selection.error}. Pass --engine <id>.`);
+  process.exit(1);
+}
+const results = selection.items;
 
 const expectedFiles = fs
   .readdirSync(SCREENSHOTS_DIR)
@@ -70,7 +63,7 @@ for (const file of expectedFiles) {
   rows.push({ name, distance, refLength, cer: distance / refLength });
 }
 
-const engine = results.find((r) => r.engine)?.engine ?? 'unknown';
+const engine = selection.id;
 console.log(`engine: ${engine}`);
 for (const r of rows) {
   console.log(

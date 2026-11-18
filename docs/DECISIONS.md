@@ -80,7 +80,20 @@
 - **No Cyrillic ML Kit artifact exists** on Google Maven (checked `group-index.xml`: only latin, chinese, devanagari,
   japanese, korean). **Measured:** the Latin recognizer gives CER 66.9% on ru fixtures (threshold 10%), en 0.2%, pl 0.6%.
   ML Kit is fine for en/pl; it cannot be used for Russian.
-- **Russian decision: Tesseract approved by the user (2026-11-18), to be built after M3.** Plan: second `OcrEngine` on Tesseract (`rus+eng+pol`
+- **Russian engine (2026-11-18): Tesseract via Tesseract4Android 4.9.0** (`cz.adaptech.tesseract4android:tesseract4android`,
+  JitPack, Apache-2.0, Tesseract 5.5.1). Latest tag on GitHub when chosen; coordinates from its README; API checked
+  against `TessBaseAPI.java` at that tag. Standard (single-threaded) variant: one `TessBaseAPI` instance on a
+  dedicated single-thread executor, because the API is not thread-safe and the pipeline runs 2 OCR calls at once.
+- **Models: tessdata_fast** `rus`, `eng`, `pol` (LSTM-only, `OEM_LSTM_ONLY`, `PSM_AUTO`), bundled as APK assets and
+  copied once to `filesDir/tesseract/tessdata` (temp file + rename). Bundled, not downloaded: no network in the
+  processing path (rule 7). sha256: rus `e16e5e03…df225`, eng `7d4322bd…170b2`, pol `c4476cdb…f79b2`.
+  Fast models first because they are ~5x smaller than `tessdata`; switch only if they fail the threshold.
+- **Engine per script** (`ScriptRoutingOcrEngine`): Tesseract `rus+eng+pol` reads every screenshot; if ≥ 30% of the
+  letters are Cyrillic its text is kept, otherwise ML Kit Latin (CER 0.2–0.6% on en/pl) reads it and wins.
+  Tesseract first because ML Kit's output on Cyrillic is Latin look-alikes ("3ameTKM") that cannot be detected
+  reliably. Cost: two OCR passes for Latin screenshots; acceptable for background processing, to be measured.
+  The 30% threshold is a first guess, not tuned on data.
+- Earlier proposal (kept for history): second `OcrEngine` on Tesseract (`rus+eng+pol`
   traineddata), chosen per detected script, as CLAUDE.md section 7 prescribes. Nothing has been added yet.
 - **Native API**: `ScreenshotOcr.recognize(imageUri, engine)` takes an engine id so a second engine (Tesseract) can be
   added behind the same call if needed. Unknown engine ids reject with `ERR_OCR_ENGINE`.

@@ -51,4 +51,47 @@ function summarize(items) {
   return perLanguage;
 }
 
-module.exports = { normalize, levenshtein, characterErrors, cer, languageOf, summarize };
+// A log can hold several engine runs (ocr-spike logs `run`); older logs only have `engine`.
+function runOf(item) {
+  return item.run ?? item.engine;
+}
+
+/** OCR_SPIKE lines from logcat → result items; the last line per (run, fixture) wins. */
+function parseLog(text) {
+  const byKey = new Map();
+  for (const line of text.split(/\r?\n/)) {
+    const at = line.indexOf('OCR_SPIKE {');
+    if (at === -1) continue;
+    try {
+      const item = JSON.parse(line.slice(at + 'OCR_SPIKE '.length));
+      byKey.set(`${runOf(item) ?? ''}|${item.name}`, item);
+    } catch {
+      // truncated logcat line: ignore, the fixture is reported as missing
+    }
+  }
+  return [...byKey.values()];
+}
+
+/**
+ * Picks one run. Without `wanted` the log must contain a single run.
+ * Items without run/engine (old-style error lines) belong to every run.
+ */
+function selectRun(results, wanted) {
+  const runs = [...new Set(results.map(runOf).filter((r) => r !== undefined))];
+  const id = wanted ?? (runs.length <= 1 ? (runs[0] ?? 'unknown') : undefined);
+  if (id === undefined) return { error: `several runs in the log (${runs.join(', ')})`, runs };
+  const items = results.filter((r) => runOf(r) === id || runOf(r) === undefined);
+  if (items.length === 0) return { error: `no results for run "${id}"`, runs };
+  return { id, items, runs };
+}
+
+module.exports = {
+  normalize,
+  levenshtein,
+  characterErrors,
+  cer,
+  languageOf,
+  summarize,
+  parseLog,
+  selectRun,
+};

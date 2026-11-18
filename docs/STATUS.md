@@ -9,6 +9,41 @@
   `ANDROID_AVD_HOME=D:\Android\avd`, WHPX acceleration). JDK 17 and Android SDK installed in M1.
 - Not macOS: iOS cannot be built here.
 
+## Milestone: M1 — Russian OCR via Tesseract: CODE WRITTEN, NOT BUILT, NOT MEASURED
+
+### Done (verified here, Linux VM, Jest)
+
+- `npm run check` — **168 tests in 17 suites** pass; `npm run format:check` passes; `npx expo export --platform android`
+  builds the JS bundle.
+- `ScriptRoutingOcrEngine` (TS): Tesseract first; text with ≥ 30% Cyrillic letters keeps the Tesseract result,
+  otherwise ML Kit Latin reads the image and wins. Either engine failing falls back to the other; both failing
+  throws with both reasons. Unit-tested with stub engines; `cyrillicShare` checked on all 6 fixture texts.
+- `ocr:accuracy` takes `--engine <run id>` (`mlkit-latin`, `tesseract`, `routed`); log parsing/selection is unit-tested;
+  re-scoring `results/mlkit-latin.json` reproduces the stored file byte-for-byte.
+- Tessdata models (tessdata_fast, `main` at `87416418`) in `modules/screenshot-ocr/android/src/main/assets/tessdata/`:
+  rus 3.9 MB, eng 4.1 MB, pol 4.8 MB (sha256 in DECISIONS.md).
+
+### UNVERIFIED (not built — no Android SDK / Maven access in this session)
+
+- Kotlin `tesseract` engine in `ScreenshotOcrModule.kt` (`cz.adaptech.tesseract4android:tesseract4android:4.9.0`
+  from JitPack). API calls were checked against the library's `TessBaseAPI.java` at tag 4.9.0, but the module was
+  **not compiled**. Expect possible compile fixes on the first Gradle build.
+- Russian CER with Tesseract is **not measured**; M1 "Done when" is still NOT met.
+- APK size impact (native libs + ~12.7 MB models) and Tesseract latency per screenshot are not measured.
+- The app now always runs Tesseract first, then ML Kit for Latin screenshots: about 2 OCR passes for en/pl.
+
+### To verify on Windows (emulator)
+
+```
+npx expo prebuild --platform android --no-install   # only if android/ is stale
+cd android && gradlew assembleDebug -PreactNativeArchitectures=x86_64 && cd ..
+# then the "Run the spike" steps below; the spike now runs 3 engines (~18 OCR calls)
+npm run ocr:accuracy -- --adb --engine tesseract
+npm run ocr:accuracy -- --adb --engine routed        # what the app uses; must pass for ru/en/pl
+```
+
+If ru still fails with tessdata_fast: try tessdata (best/legacy, ~20 MB per language) before anything else.
+
 ## Milestone: M3 (full-text search) — DONE in Jest/Node; NOT run on the emulator or a device
 
 M1 is still open (Russian OCR). By user decision (2026-11-18) M3 was done first; Tesseract comes next.
@@ -85,7 +120,7 @@ swapped in later. Until then Russian screenshots are stored with garbage text (M
 - Maestro e2e flow not written (M4 covers e2e).
 - Finding for M3: FTS5 `remove_diacritics` does not fold Polish `ł`. **Resolved in M3** (folded `search_text`).
 
-## Milestone: M1 (Android OCR spike) — MEASURED; Russian FAILS the threshold; Tesseract approved, not built yet
+## Milestone: M1 (Android OCR spike) — ML Kit MEASURED; Russian FAILS with ML Kit (Tesseract: see above)
 
 ### ML Kit (bundled Latin, 16.0.1) results — emulator, 6 synthetic fixtures
 
@@ -110,11 +145,11 @@ Russian output is Latin-lookalike transliteration (e.g. "Заметки" -> "3am
 
 ### NOT done / unverified
 
-- **Russian OCR**: user approved the Tesseract engine (2026-11-18), to be built after M3. Nothing added yet.
+- **Russian OCR**: Tesseract engine written (see the Tesseract section above), not built or measured yet.
 - Measured on an emulator only, not on a physical device. The ML Kit model is the same, but timing is not representative.
 - Instrumented (androidTest) test of the module: not written.
 - Fixtures are synthetic (Segoe UI, clean, 6 images). Real screenshots may score worse; ru has only 519 reference chars.
-- M1 "Done when" is NOT satisfied: accuracy script fails on ru and no Russian engine exists yet.
+- M1 "Done when" is NOT satisfied: the Russian engine exists in code but is not built or measured.
 
 ### Build environment (this machine)
 
@@ -162,14 +197,14 @@ npx expo start --dev-client                      # keep running
 adb logcat -c
 adb shell am start -a android.intent.action.VIEW -d "exp+snapshelf://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081"
 adb shell am start -a android.intent.action.VIEW -d "snapshelf:///ocr-spike"
-npm run ocr:accuracy -- --adb                    # after OCR_SPIKE_DONE appears in logcat
+npm run ocr:accuracy -- --adb --engine routed    # after OCR_SPIKE_DONE appears in logcat
 ```
 
 (`/sdcard/Android/data/...` does not work: files pushed by `shell` are not readable by the app, EACCES.)
 
 ### Next
 
-1. Verify M3 on the emulator (rebuild dev client, search in the app, check the v2 → v3 migration on the old DB).
-2. M1: second `OcrEngine` on Tesseract (`rus+eng+pol`), chosen per detected script — user approved doing it after
-   M3 (2026-11-18). Then re-run `npm run ocr:accuracy` and close M1.
-3. M4: extraction + "found items" UI.
+1. On Windows: build with Tesseract, fix compile errors if any, run the spike, `ocr:accuracy --engine routed`.
+   Close M1 if ru/en/pl pass; record APK size and per-image latency in DECISIONS.md.
+2. Verify M3 on the emulator (search in the app, v2 → v3 migration on the old DB).
+3. M4: extraction + "found items" UI (extractors are pure TS and can be done without a device).

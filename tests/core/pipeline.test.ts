@@ -334,3 +334,47 @@ describe('ScreenshotPipeline.watch', () => {
     expect(onError.mock.calls[0][0]).toEqual(new Error('db gone'));
   });
 });
+
+describe('ScreenshotPipeline: extraction (M4)', () => {
+  it('stores entities with the text, resolving dates against the screenshot day', async () => {
+    const takenAt = new Date('2026-11-18T10:00').getTime();
+    const shot = ref(1, { takenAt });
+    const { pipeline, repo, ocr } = await setup(
+      {},
+      new FakeScreenshotSource({ screenshots: [shot] }),
+    );
+    ocr.setText(shot.uri, 'Купить молоко завтра\nhttps://example.com  +48 501 234 567');
+
+    await pipeline.sync();
+    await pipeline.processPending();
+
+    const entities = await repo.getEntities('s1');
+    expect(entities.map(({ type, normalized }) => [type, normalized])).toEqual([
+      ['link', 'https://example.com'],
+      ['phone', '+48501234567'],
+      ['date', '2026-11-19'],
+      ['task', 'Купить молоко завтра'],
+    ]);
+    expect(entities.every((e) => e.screenshotId === 's1' && e.id > 0)).toBe(true);
+  });
+
+  it('keeps entities idempotent when a screenshot is processed again', async () => {
+    const shot = ref(1);
+    const { pipeline, repo, ocr } = await setup(
+      {},
+      new FakeScreenshotSource({ screenshots: [shot] }),
+    );
+    ocr.setText(shot.uri, 'a@b.com');
+    await pipeline.sync();
+    await pipeline.processPending();
+
+    await repo.markProcessed('s1', {
+      ocrText: 'a@b.com',
+      topic: null,
+      processedAt: 2,
+      entities: [{ type: 'email', value: 'a@b.com', normalized: 'a@b.com' }],
+    });
+
+    expect(await repo.getEntities('s1')).toHaveLength(1);
+  });
+});

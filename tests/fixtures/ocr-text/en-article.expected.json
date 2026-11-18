@@ -1,0 +1,28 @@
+{
+  "takenAt": "2026-11-18T10:00",
+  "entities": [
+    {
+      "type": "link",
+      "value": "https://example.com/articles/42",
+      "normalized": "https://example.com/articles/42"
+    },
+    {
+      "type": "email",
+      "value": "support@example.com",
+      "normalized": "support@example.com"
+    },
+    {
+      "type": "phone",
+      "value": "+1 202 555 0143",
+      "normalized": "+12025550143"
+    },
+    {
+      "type": "date",
+      "value": "October 31 at 9:00 AM",
+      "normalized": "2026-10-31T09:00",
+      "extra": {
+        "hasTime": true
+      }
+    }
+  ]
+}

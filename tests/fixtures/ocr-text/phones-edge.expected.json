@@ -1,0 +1,46 @@
+{
+  "takenAt": "2026-11-18T10:00",
+  "entities": [
+    {
+      "type": "phone",
+      "value": "8 (912) 345-67-89",
+      "normalized": "89123456789"
+    },
+    {
+      "type": "phone",
+      "value": "+44 20 7946 0958",
+      "normalized": "+442079460958"
+    },
+    {
+      "type": "phone",
+      "value": "+48 501-234-567",
+      "normalized": "+48501234567"
+    },
+    {
+      "type": "phone",
+      "value": "+7 912 345 67 89",
+      "normalized": "+79123456789"
+    },
+    {
+      "type": "phone",
+      "value": "+48 22 123 45 67",
+      "normalized": "+48221234567"
+    },
+    {
+      "type": "date",
+      "value": "2026-11-18",
+      "normalized": "2026-11-18",
+      "extra": {
+        "hasTime": false
+      }
+    },
+    {
+      "type": "date",
+      "value": "12.03.2026",
+      "normalized": "2026-03-12",
+      "extra": {
+        "hasTime": false
+      }
+    }
+  ]
+}

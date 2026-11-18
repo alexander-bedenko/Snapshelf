@@ -25,6 +25,34 @@
 - **Platforms**: `android`, `ios` only (web removed).
 - **Line endings**: LF enforced via `.gitattributes`.
 
+## M4
+
+- **Order**: M4 started before M1/M3 were verified on the emulator, user decision 2026-11-18.
+- **No schema change**: entities go into the v1 `entities` table; `extra` holds JSON (`{hasTime}` for dates,
+  `{rule, done}` for tasks). Changing the data model after M3 needs the user's approval (CLAUDE.md section 14).
+- **Extraction runs in the pipeline** after normalization, inside the same try as OCR (a bug in an extractor marks
+  the screenshot failed instead of breaking the pool); entities are written in the `markProcessed` transaction.
+  Duplicates (same type + normalized value) are kept once.
+- **Dates are local ISO 8601 without offset** (`2026-03-12`, `2026-03-12T15:30`), resolved in device local time
+  against `taken_at`: relative words (today/tomorrow/day after; сегодня/завтра/послезавтра; dziś/jutro/pojutrze),
+  weekdays (next occurrence, the screenshot's own day included), `d month [year]`, `month d[, year]`, `dd.mm.yyyy`,
+  `dd/mm/yy` (day first), `yyyy-mm-dd`. A time joins the closest date before it, else after it. A time alone
+  counts (on the screenshot's day) only after a preposition (at/в/o/do/godz.), so status-bar clocks are ignored.
+- **Phones**: 9–15 digits, separators space/dash/brackets (no dots, no line breaks); `+` kept in the normalized form.
+- **Links**: scheme URLs, `www.`, and bare domains with a TLD whitelist that leaves out TLDs that are common words
+  (`it`, `at`, `be`, `no`, `me`…) because OCR drops spaces after periods. Emails are masked before link search;
+  dates and phones are not looked for inside links/emails.
+- **Tasks**: checkbox glyphs / `[ ]` `[x]` (checked = done), keywords (TODO, нужно/надо, need to, trzeba), or a line
+  starting with a ru/pl infinitive (stop lists for nouns like часть, cześć), or an English imperative after a bullet.
+  At most 10 words, not a question.
+- **Tap actions** via React Native `Linking.openURL` (no new dependency): `https://`, `mailto:`, `tel:`, and the
+  CalendarContract view URI `content://com.android.calendar/time/<epoch ms>` for dates. Adding a calendar event would
+  need an intent with extras (e.g. `expo-intent-launcher`); not added.
+- **Tasks are checked off inside the app** (`Repository.setTaskDone`), not exported anywhere.
+- **Test time zone**: Jest `globalSetup` sets `TZ=Europe/Warsaw` for every worker; setting `process.env.TZ` inside
+  a test file does not affect `Date` in Jest's sandbox (found while writing these tests).
+- **Detail route** `/screenshot/[id]`; the app shares one repository instance (`getRepository()` in `services.ts`).
+
 ## M3
 
 - **Order**: M3 before closing M1 (Russian OCR), user decision 2026-11-18. Tesseract is the next step after M3.

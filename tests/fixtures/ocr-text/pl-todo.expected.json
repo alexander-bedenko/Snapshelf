@@ -1,0 +1,58 @@
+{
+  "takenAt": "2026-11-18T10:00",
+  "entities": [
+    {
+      "type": "link",
+      "value": "https://example.pl/zakupy",
+      "normalized": "https://example.pl/zakupy"
+    },
+    {
+      "type": "email",
+      "value": "anna.kowalska@example.pl",
+      "normalized": "anna.kowalska@example.pl"
+    },
+    {
+      "type": "date",
+      "value": "jutro",
+      "normalized": "2026-11-19",
+      "extra": {
+        "hasTime": false
+      }
+    },
+    {
+      "type": "date",
+      "value": "środę o 14:00",
+      "normalized": "2026-11-18T14:00",
+      "extra": {
+        "hasTime": true
+      }
+    },
+    {
+      "type": "task",
+      "value": "Trzeba kupić mleko, chleb i jajka",
+      "normalized": "Trzeba kupić mleko, chleb i jajka",
+      "extra": {
+        "rule": "keyword",
+        "done": false
+      }
+    },
+    {
+      "type": "task",
+      "value": "Zadzwonić do lekarza jutro rano",
+      "normalized": "Zadzwonić do lekarza jutro rano",
+      "extra": {
+        "rule": "verb",
+        "done": false
+      }
+    },
+    {
+      "type": "task",
+      "value": "Zażółć gęślą jaźń",
+      "normalized": "Zażółć gęślą jaźń",
+      "extra": {
+        "rule": "verb",
+        "done": false
+      }
+    }
+  ]
+}

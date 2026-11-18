@@ -1,0 +1,5 @@
+Docs: https://Example.COM/Path?q=1#top, and (see https://en.wikipedia.org/wiki/Foo_(bar)).
+Mirror at www.example.org/files. Or example.dev!
+Write to Ivan.Petrov@Example.com.
+Node.js is not a link, nor is report.pdf or the.It typo.
+Сайт: disk.example.ru/папка «https://example.pl/zakupy»

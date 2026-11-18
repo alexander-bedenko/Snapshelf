@@ -4,6 +4,7 @@ import type { PermissionState, ScreenshotRecord, Unsub } from '@/core/types';
 import type { OcrEngine } from '@/platform/ocr/OcrEngine';
 import type { ScreenshotSource } from '@/platform/media/ScreenshotSource';
 
+import { extractEntities, type ExtractedEntity } from '../extract';
 import { normalizeOcrText } from './normalize';
 
 export type PipelineOptions = {
@@ -164,9 +165,12 @@ export class ScreenshotPipeline {
 
   private async processOne(item: ScreenshotRecord): Promise<boolean> {
     let ocrText: string;
+    let entities: ExtractedEntity[];
     try {
       const recognized = await this.deps.ocr.recognize(item.uri, this.o.langHints);
       ocrText = normalizeOcrText(recognized.text);
+      // Dates like "tomorrow" resolve against the day the screenshot was taken.
+      entities = extractEntities(ocrText, item.takenAt);
     } catch (error) {
       await this.deps.repo.markFailed(
         item.id,
@@ -180,6 +184,7 @@ export class ScreenshotPipeline {
       ocrText,
       topic: null,
       processedAt: this.o.now(),
+      entities,
     });
     this.emit();
     return true;

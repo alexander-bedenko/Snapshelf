@@ -1,0 +1,93 @@
+{
+  "takenAt": "2026-11-18T10:00",
+  "entities": [
+    {
+      "type": "date",
+      "value": "Monday at 3 PM",
+      "normalized": "2026-11-23T15:00",
+      "extra": {
+        "hasTime": true
+      }
+    },
+    {
+      "type": "date",
+      "value": "12/01/2026",
+      "normalized": "2026-01-12",
+      "extra": {
+        "hasTime": false
+      }
+    },
+    {
+      "type": "date",
+      "value": "2026-12-24",
+      "normalized": "2026-12-24",
+      "extra": {
+        "hasTime": false
+      }
+    },
+    {
+      "type": "date",
+      "value": "5.1.27",
+      "normalized": "2027-01-05",
+      "extra": {
+        "hasTime": false
+      }
+    },
+    {
+      "type": "date",
+      "value": "завтра в 10:00",
+      "normalized": "2026-11-19T10:00",
+      "extra": {
+        "hasTime": true
+      }
+    },
+    {
+      "type": "date",
+      "value": "послезавтра",
+      "normalized": "2026-11-20",
+      "extra": {
+        "hasTime": false
+      }
+    },
+    {
+      "type": "date",
+      "value": "1 сентября 2027 в 9:30",
+      "normalized": "2027-09-01T09:30",
+      "extra": {
+        "hasTime": true
+      }
+    },
+    {
+      "type": "date",
+      "value": "3 lipca",
+      "normalized": "2026-07-03",
+      "extra": {
+        "hasTime": false
+      }
+    },
+    {
+      "type": "date",
+      "value": "pojutrze o 8:00",
+      "normalized": "2026-11-20T08:00",
+      "extra": {
+        "hasTime": true
+      }
+    },
+    {
+      "type": "date",
+      "value": "dzisiaj o godz. 18:30",
+      "normalized": "2026-11-18T18:30",
+      "extra": {
+        "hasTime": true
+      }
+    },
+    {
+      "type": "date",
+      "value": "Dec 31st, 2026 at 11:30 pm",
+      "normalized": "2026-12-31T23:30",
+      "extra": {
+        "hasTime": true
+      }
+    }
+  ]
+}

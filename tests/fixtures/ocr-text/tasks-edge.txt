@@ -1,0 +1,14 @@
+Shopping
+[ ] milk
+[x] bread
+☐ Позвонить маме
+☑ Zapłacić rachunek
+- Buy batteries
+• Call the bank
+Call us: +1 202 555 0143
+TODO: renew passport
+Надо записаться к врачу
+Часть первая
+Как купить билет?
+Cześć! Co słychać?
+- Weather is nice

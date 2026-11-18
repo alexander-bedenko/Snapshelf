@@ -1,4 +1,11 @@
-import type { ListOptions, ProcessedResult, Repository, SearchOptions } from '@/core/repository';
+import type { ExtractedEntity } from '@/core/extract';
+import type {
+  ListOptions,
+  ProcessedResult,
+  Repository,
+  SearchOptions,
+  StoredEntity,
+} from '@/core/repository';
 import { buildFtsQuery, foldForSearch } from '@/core/search/query';
 import type { ScreenshotRecord, ScreenshotRef, ScreenshotStatus } from '@/core/types';
 
@@ -24,6 +31,27 @@ const COLUMNS =
 const S_COLUMNS = COLUMNS.split(', ')
   .map((c) => `s.${c}`)
   .join(', ');
+
+type EntityRow = {
+  id: number;
+  screenshot_id: string;
+  type: ExtractedEntity['type'];
+  value: string;
+  normalized: string | null;
+  extra: string | null;
+};
+
+function toEntity(row: EntityRow): StoredEntity {
+  const base = {
+    id: row.id,
+    screenshotId: row.screenshot_id,
+    value: row.value,
+    normalized: row.normalized ?? row.value,
+  };
+  const extra = row.extra ? JSON.parse(row.extra) : undefined;
+  if (row.type === 'date' || row.type === 'task') return { ...base, type: row.type, extra };
+  return { ...base, type: row.type };
+}
 
 function toRecord(row: Row): ScreenshotRecord {
   return {
@@ -142,6 +170,41 @@ export class SqliteRepository implements Repository {
          WHERE id = ?`,
         [result.ocrText, foldForSearch(result.ocrText), result.topic, result.processedAt, id],
       );
+      for (const entity of result.entities ?? []) {
+        await tx.run(
+          `INSERT INTO entities (screenshot_id, type, value, normalized, extra)
+           VALUES (?, ?, ?, ?, ?)`,
+          [
+            id,
+            entity.type,
+            entity.value,
+            entity.normalized,
+            entity.extra ? JSON.stringify(entity.extra) : null,
+          ],
+        );
+      }
+    });
+  }
+
+  async getEntities(screenshotId: string): Promise<StoredEntity[]> {
+    const rows = await this.db.all<EntityRow>(
+      `SELECT id, screenshot_id, type, value, normalized, extra
+       FROM entities WHERE screenshot_id = ? ORDER BY id`,
+      [screenshotId],
+    );
+    return rows.map(toEntity);
+  }
+
+  async setTaskDone(entityId: number, done: boolean): Promise<boolean> {
+    return this.db.transaction(async (tx) => {
+      const [row] = await tx.all<{ extra: string | null }>(
+        `SELECT extra FROM entities WHERE id = ? AND type = 'task'`,
+        [entityId],
+      );
+      if (!row) return false;
+      const extra = { ...(row.extra ? JSON.parse(row.extra) : {}), done };
+      await tx.run('UPDATE entities SET extra = ? WHERE id = ?', [JSON.stringify(extra), entityId]);
+      return true;
     });
   }
 

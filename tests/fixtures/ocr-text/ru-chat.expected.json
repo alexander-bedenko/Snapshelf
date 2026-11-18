@@ -1,0 +1,26 @@
+{
+  "takenAt": "2026-11-18T10:00",
+  "entities": [
+    {
+      "type": "link",
+      "value": "https://disk.example.ru/docs",
+      "normalized": "https://disk.example.ru/docs"
+    },
+    {
+      "type": "date",
+      "value": "Сегодня",
+      "normalized": "2026-11-18",
+      "extra": {
+        "hasTime": false
+      }
+    },
+    {
+      "type": "date",
+      "value": "понедельник",
+      "normalized": "2026-11-23",
+      "extra": {
+        "hasTime": false
+      }
+    }
+  ]
+}

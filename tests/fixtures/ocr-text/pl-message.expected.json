@@ -1,0 +1,18 @@
+{
+  "takenAt": "2026-11-18T10:00",
+  "entities": [
+    {
+      "type": "phone",
+      "value": "+48 501 234 567",
+      "normalized": "+48501234567"
+    },
+    {
+      "type": "date",
+      "value": "poniedziałek",
+      "normalized": "2026-11-23",
+      "extra": {
+        "hasTime": false
+      }
+    }
+  ]
+}

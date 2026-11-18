@@ -202,3 +202,80 @@ describe('SqliteRepository', () => {
     expect(new Set(ids).size).toBe(20);
   });
 });
+
+describe('SqliteRepository: entities', () => {
+  async function processed() {
+    const { repo, db } = await openTestRepo();
+    await repo.upsertDiscovered([ref(1), ref(2)]);
+    await repo.markProcessed('s1', {
+      ocrText: 'x',
+      topic: null,
+      processedAt: 1,
+      entities: [
+        { type: 'link', value: 'x.com', normalized: 'https://x.com' },
+        { type: 'date', value: 'завтра', normalized: '2026-11-19', extra: { hasTime: false } },
+        {
+          type: 'task',
+          value: '[ ] milk',
+          normalized: 'milk',
+          extra: { rule: 'checkbox', done: false },
+        },
+      ],
+    });
+    return { repo, db };
+  }
+
+  it('stores and reads entities in extraction order with their extra data', async () => {
+    const { repo } = await processed();
+
+    const entities = await repo.getEntities('s1');
+
+    expect(entities.map(({ id: _id, ...rest }) => rest)).toEqual([
+      { screenshotId: 's1', type: 'link', value: 'x.com', normalized: 'https://x.com' },
+      {
+        screenshotId: 's1',
+        type: 'date',
+        value: 'завтра',
+        normalized: '2026-11-19',
+        extra: { hasTime: false },
+      },
+      {
+        screenshotId: 's1',
+        type: 'task',
+        value: '[ ] milk',
+        normalized: 'milk',
+        extra: { rule: 'checkbox', done: false },
+      },
+    ]);
+    expect(await repo.getEntities('s2')).toEqual([]);
+  });
+
+  it('replaces entities on reprocessing and removes them with the screenshot', async () => {
+    const { repo, db } = await processed();
+
+    await repo.markProcessed('s1', { ocrText: 'y', topic: null, processedAt: 2 });
+    expect(await repo.getEntities('s1')).toEqual([]);
+
+    await repo.markProcessed('s1', {
+      ocrText: 'y',
+      topic: null,
+      processedAt: 3,
+      entities: [{ type: 'email', value: 'a@b.c', normalized: 'a@b.c' }],
+    });
+    await db.run(`DELETE FROM screenshots WHERE id = 's1'`);
+    expect(await db.all('SELECT id FROM entities')).toEqual([]);
+  });
+
+  it('toggles a task done, keeping its other data, and refuses non-tasks', async () => {
+    const { repo } = await processed();
+    const [link, , task] = await repo.getEntities('s1');
+
+    expect(await repo.setTaskDone(task.id, true)).toBe(true);
+    expect((await repo.getEntities('s1'))[2].extra).toEqual({ rule: 'checkbox', done: true });
+    expect(await repo.setTaskDone(task.id, false)).toBe(true);
+    expect((await repo.getEntities('s1'))[2].extra).toEqual({ rule: 'checkbox', done: false });
+
+    expect(await repo.setTaskDone(link.id, true)).toBe(false);
+    expect(await repo.setTaskDone(9999, true)).toBe(false);
+  });
+});

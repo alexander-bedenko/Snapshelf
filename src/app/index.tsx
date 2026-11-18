@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, AppState, Text, View } from 'react-native';
 import { useStore } from 'zustand';
@@ -27,6 +28,7 @@ function Connected({ store }: { store: LibraryStore }) {
         refresh: () => void state.refresh(),
         openSettings: openAppSettings,
         setQuery: state.setQuery,
+        openScreenshot: (id) => router.push({ pathname: '/screenshot/[id]', params: { id } }),
       }}
       strings={strings}
     />

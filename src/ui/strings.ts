@@ -20,6 +20,16 @@ export type Strings = {
   searchClear: string;
   noResults: (query: string) => string;
   resultsCount: (count: number) => string;
+  back: string;
+  foundTitle: string;
+  nothingFound: string;
+  recognizedText: string;
+  screenshotMissing: string;
+  entityLabel: { link: string; email: string; phone: string; date: string; task: string };
+  taskDone: string;
+  taskOpen: string;
+  openFailed: (target: string) => string;
+  foundCount: (count: number) => string;
 };
 
 function ruPlural(n: number, one: string, few: string, many: string): string {
@@ -53,6 +63,16 @@ const en: Strings = {
   searchClear: 'Clear search',
   noResults: (query) => `Nothing found for “${query}”`,
   resultsCount: (count) => (count === 1 ? '1 screenshot found' : `${count} screenshots found`),
+  back: 'Back',
+  foundTitle: 'Found in this screenshot',
+  nothingFound: 'No links, dates, contacts or tasks found.',
+  recognizedText: 'Recognized text',
+  screenshotMissing: 'This screenshot is no longer in the library.',
+  entityLabel: { link: 'Link', email: 'Email', phone: 'Phone', date: 'Date', task: 'Task' },
+  taskDone: 'Done',
+  taskOpen: 'Not done',
+  openFailed: (target) => `Could not open ${target}`,
+  foundCount: (count) => (count === 1 ? '1 item found' : `${count} items found`),
 };
 
 const ru: Strings = {
@@ -79,6 +99,17 @@ const ru: Strings = {
   noResults: (query) => `По запросу «${query}» ничего не найдено`,
   resultsCount: (count) =>
     `${ruPlural(count, 'Найден', 'Найдено', 'Найдено')} ${count} ${ruPlural(count, 'скриншот', 'скриншота', 'скриншотов')}`,
+  back: 'Назад',
+  foundTitle: 'Найдено на скриншоте',
+  nothingFound: 'Ссылок, дат, контактов и задач не найдено.',
+  recognizedText: 'Распознанный текст',
+  screenshotMissing: 'Этого скриншота больше нет в библиотеке.',
+  entityLabel: { link: 'Ссылка', email: 'Почта', phone: 'Телефон', date: 'Дата', task: 'Задача' },
+  taskDone: 'Сделано',
+  taskOpen: 'Не сделано',
+  openFailed: (target) => `Не удалось открыть ${target}`,
+  foundCount: (count) =>
+    `${ruPlural(count, 'Найден', 'Найдено', 'Найдено')} ${count} ${ruPlural(count, 'элемент', 'элемента', 'элементов')}`,
 };
 
 export function getStrings(locale: string): Strings {

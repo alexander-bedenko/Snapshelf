@@ -34,6 +34,7 @@ export type LibraryScreenProps = {
     refresh(): void;
     openSettings(): void;
     setQuery(query: string): void;
+    openScreenshot(id: string): void;
   };
   strings: Strings;
 };
@@ -83,12 +84,25 @@ function PermissionCard({ state, actions, strings }: LibraryScreenProps) {
   );
 }
 
-function Row({ item, strings }: { item: ScreenshotRecord; strings: Strings }) {
+function Row({
+  item,
+  strings,
+  onPress,
+}: {
+  item: ScreenshotRecord;
+  strings: Strings;
+  onPress(): void;
+}) {
   let snippet = '';
   if (item.status === 'done') snippet = item.ocrText ? item.ocrText.slice(0, 140) : strings.noText;
   if (item.status === 'failed') snippet = item.error ?? '';
   return (
-    <View style={styles.row} testID={`row-${item.id}`}>
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={styles.row}
+      testID={`row-${item.id}`}
+    >
       <Image source={{ uri: item.uri }} style={styles.thumb} />
       <View style={styles.rowText}>
         <Text style={styles.status}>{strings.status[item.status]}</Text>
@@ -98,7 +112,7 @@ function Row({ item, strings }: { item: ScreenshotRecord; strings: Strings }) {
           </Text>
         ) : null}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -184,7 +198,9 @@ export function LibraryScreen(props: LibraryScreenProps) {
         data={results ?? state.items}
         keyboardShouldPersistTaps="handled"
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <Row item={item} strings={strings} />}
+        renderItem={({ item }) => (
+          <Row item={item} onPress={() => actions.openScreenshot(item.id)} strings={strings} />
+        )}
         initialNumToRender={10}
         windowSize={7}
       />

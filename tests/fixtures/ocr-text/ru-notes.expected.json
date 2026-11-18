@@ -1,0 +1,88 @@
+{
+  "takenAt": "2026-11-18T10:00",
+  "entities": [
+    {
+      "type": "link",
+      "value": "https://example.com/plan",
+      "normalized": "https://example.com/plan"
+    },
+    {
+      "type": "email",
+      "value": "ivan.petrov@example.com",
+      "normalized": "ivan.petrov@example.com"
+    },
+    {
+      "type": "phone",
+      "value": "+7 912 345 67 89",
+      "normalized": "+79123456789"
+    },
+    {
+      "type": "date",
+      "value": "пятницу",
+      "normalized": "2026-11-20",
+      "extra": {
+        "hasTime": false
+      }
+    },
+    {
+      "type": "date",
+      "value": "15:30",
+      "normalized": "2026-11-18T15:30",
+      "extra": {
+        "hasTime": true
+      }
+    },
+    {
+      "type": "date",
+      "value": "завтра",
+      "normalized": "2026-11-19",
+      "extra": {
+        "hasTime": false
+      }
+    },
+    {
+      "type": "date",
+      "value": "12 марта",
+      "normalized": "2026-03-12",
+      "extra": {
+        "hasTime": false
+      }
+    },
+    {
+      "type": "task",
+      "value": "Купить молоко и хлеб",
+      "normalized": "Купить молоко и хлеб",
+      "extra": {
+        "rule": "verb",
+        "done": false
+      }
+    },
+    {
+      "type": "task",
+      "value": "Позвонить врачу в 15:30",
+      "normalized": "Позвонить врачу в 15:30",
+      "extra": {
+        "rule": "verb",
+        "done": false
+      }
+    },
+    {
+      "type": "task",
+      "value": "Нужно отправить отчёт до завтра",
+      "normalized": "Нужно отправить отчёт до завтра",
+      "extra": {
+        "rule": "keyword",
+        "done": false
+      }
+    },
+    {
+      "type": "task",
+      "value": "Оплатить интернет и электричество",
+      "normalized": "Оплатить интернет и электричество",
+      "extra": {
+        "rule": "verb",
+        "done": false
+      }
+    }
+  ]
+}

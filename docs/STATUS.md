@@ -9,6 +9,44 @@
   `ANDROID_AVD_HOME=D:\Android\avd`, WHPX acceleration). JDK 17 and Android SDK installed in M1.
 - Not macOS: iOS cannot be built here.
 
+## Milestone: M4 (extraction + "found items") — LOGIC AND UI DONE in Jest; NOT run on the emulator; Maestro NOT run
+
+Started on the user's decision (2026-11-18) while M1 (Tesseract build + CER) and M3 (on-device check) still wait for
+a Windows build. Pure TS and RN screens only: no native code, no new dependencies.
+
+### Verified (commands run, Linux VM, Node 22.23.4, fresh `npm ci`)
+
+- `npm run check` — typecheck, lint, **211 tests in 21 suites** pass (twice in a row); `npm run format:check` passes;
+  `npx expo export --platform android` builds the bundle with the new `/screenshot/[id]` route.
+- Extraction fixtures: 10 cases in `tests/fixtures/ocr-text/` (the 6 OCR reference texts + links, phones, dates,
+  tasks edge cases), each `<case>.txt` + `<case>.expected.json`; every expected entity was reviewed by hand.
+- Unit tests: dates in the pinned zone (Europe/Warsaw via `tests/globalSetup.js`) incl. a day boundary that differs
+  from UTC, weekday on its own day, 12 AM/PM, impossible dates, status-bar clock ignored, no dates/phones inside links.
+- Pipeline stores entities with the text in one transaction; reprocessing replaces them; deleting a screenshot
+  cascades; task done/undone is stored in `entities.extra`.
+- "Found items" screen (RNTL with a fake repository): labels, date display, recognized text, nothing-found and
+  missing-screenshot states, ru strings; tapping link/email/phone/date calls `Linking.openURL` with
+  `https://…`/`mailto:`/`tel:`/`content://com.android.calendar/time/<ms>`; tapping a task toggles it; an app that
+  cannot be opened shows an error. Library row tap opens the screen.
+- Mutation checks: breaking the task toggle fails 1 UI test; breaking the month in `localIsoToEpoch` fails 3 tests.
+- Two bugs found by the fixtures and fixed before commit: a URL ending in a balanced `)` lost it; a time joined the
+  nearest date instead of the date before it ("Jan 2 at 12 am, Jan 3").
+
+### NOT verified / known gaps
+
+- **Not run on the emulator**: whether Android opens `mailto:`, `tel:` and especially the calendar
+  `content://com.android.calendar/time/<ms>` URI from `Linking.openURL` (the google_apis image may have no calendar
+  app — then the screen shows "Could not open …").
+- **Maestro flow `e2e/found-items.yaml` is written but was never run** (Maestro not installed; M4 "Done when" needs it).
+- Screenshots processed before M4 have no entities until they are processed again (reprocess action is M5).
+  The only such data is the emulator test DB: clear app data or wait for M5.
+- Re-processing a screenshot resets its tasks' done state (entities are rebuilt from the text).
+- Year-less dates take the screenshot's year (`12 марта` on a November screenshot → March of that year, in the past).
+  Numeric dates are day-first (`12/01/2026` = 12 January). `dd.mm` without a year is not recognized.
+- English imperative tasks are recognized only after a bullet; ru/pl infinitive lines count without one
+  (so the Polish pangram line "Zażółć gęślą jaźń" is a task: it is an imperative).
+- Library rows do not show how many items were found yet.
+
 ## Milestone: M1 — Russian OCR via Tesseract: CODE WRITTEN, NOT BUILT, NOT MEASURED
 
 ### Done (verified here, Linux VM, Jest)
@@ -207,4 +245,6 @@ npm run ocr:accuracy -- --adb --engine routed    # after OCR_SPIKE_DONE appears 
 1. On Windows: build with Tesseract, fix compile errors if any, run the spike, `ocr:accuracy --engine routed`.
    Close M1 if ru/en/pl pass; record APK size and per-image latency in DECISIONS.md.
 2. Verify M3 on the emulator (search in the app, v2 → v3 migration on the old DB).
-3. M4: extraction + "found items" UI (extractors are pure TS and can be done without a device).
+3. On Windows: verify M4 on the emulator (open a screenshot, tap link/email/phone/date/task), install Maestro and
+   run `npm run e2e:android`; then M4 is done.
+4. M5: polish, error states, settings, reprocess action (also fills entities for pre-M4 screenshots).

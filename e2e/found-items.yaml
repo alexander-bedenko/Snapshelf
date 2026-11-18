@@ -1,0 +1,54 @@
+# M4: open a screenshot from search, check off a task, open a link and a date.
+# UNVERIFIED: written without Maestro or an emulator (see docs/STATUS.md).
+#
+# Preconditions (same setup as the M2 emulator run):
+#   adb push tests/fixtures/screenshots/pl-todo.png /sdcard/Pictures/Screenshots/
+#   the dev build is installed and Metro is running (npm start), app data cleared.
+appId: com.snapshelf.app
+name: Found items
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: allow-access
+    commands:
+      - tapOn:
+          id: allow-access
+      # Android 14 asks "Allow all" / "Select photos" / "Don't allow"; 13 asks "Allow".
+      - tapOn:
+          text: 'Allow all|Allow'
+          optional: true
+- extendedWaitUntil:
+    visible:
+      id: search-input
+    timeout: 120000
+- tapOn:
+    id: search-input
+- inputText: 'lekarza'
+# The pipeline may still be reading the screenshot; the search refreshes when it is done.
+- extendedWaitUntil:
+    visible: '.*Zadzwonić do lekarza.*'
+    timeout: 120000
+- tapOn: '.*Zadzwonić do lekarza.*'
+- assertVisible:
+    id: found-items
+# Task: check off and back on.
+- tapOn: 'Zadzwonić do lekarza jutro rano'
+- assertVisible: '☑'
+- tapOn: 'Zadzwonić do lekarza jutro rano'
+- assertVisible: '☐'
+# Link: opens the browser, then come back.
+- tapOn: 'https://example.pl/zakupy'
+- back
+- assertVisible:
+    id: found-items
+# Date: opens the calendar at that day, then come back.
+- tapOn: '.*środę o 14:00.*'
+- back
+- assertVisible:
+    id: found-items
+- tapOn:
+    id: back
+- assertVisible:
+    id: search-input

@@ -8,12 +8,21 @@ import { MlKitLatinOcrEngine } from '@/platform/ocr/android/MlKitLatinOcrEngine'
 import { TesseractOcrEngine } from '@/platform/ocr/android/TesseractOcrEngine';
 import { ScriptRoutingOcrEngine } from '@/platform/ocr/ScriptRoutingOcrEngine';
 
+import type { Repository } from '@/core/repository';
+
 let pending: Promise<LibraryStore> | null = null;
+let repository: Promise<Repository> | null = null;
+
+/** The single app-wide repository (one SQLite connection). */
+export function getRepository(): Promise<Repository> {
+  repository ??= openRepository();
+  return repository;
+}
 
 /** Composition root: builds the real DB, source, OCR engine and pipeline once per app run. */
 export function getLibraryStore(): Promise<LibraryStore> {
   pending ??= (async () => {
-    const repo = await openRepository();
+    const repo = await getRepository();
     const source = createAndroidScreenshotSource();
     const pipeline = new ScreenshotPipeline(
       {

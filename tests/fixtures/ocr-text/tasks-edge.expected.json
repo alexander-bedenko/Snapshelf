@@ -1,0 +1,82 @@
+{
+  "takenAt": "2026-11-18T10:00",
+  "entities": [
+    {
+      "type": "phone",
+      "value": "+1 202 555 0143",
+      "normalized": "+12025550143"
+    },
+    {
+      "type": "task",
+      "value": "[ ] milk",
+      "normalized": "milk",
+      "extra": {
+        "rule": "checkbox",
+        "done": false
+      }
+    },
+    {
+      "type": "task",
+      "value": "[x] bread",
+      "normalized": "bread",
+      "extra": {
+        "rule": "checkbox",
+        "done": true
+      }
+    },
+    {
+      "type": "task",
+      "value": "☐ Позвонить маме",
+      "normalized": "Позвонить маме",
+      "extra": {
+        "rule": "checkbox",
+        "done": false
+      }
+    },
+    {
+      "type": "task",
+      "value": "☑ Zapłacić rachunek",
+      "normalized": "Zapłacić rachunek",
+      "extra": {
+        "rule": "checkbox",
+        "done": true
+      }
+    },
+    {
+      "type": "task",
+      "value": "- Buy batteries",
+      "normalized": "Buy batteries",
+      "extra": {
+        "rule": "verb",
+        "done": false
+      }
+    },
+    {
+      "type": "task",
+      "value": "• Call the bank",
+      "normalized": "Call the bank",
+      "extra": {
+        "rule": "verb",
+        "done": false
+      }
+    },
+    {
+      "type": "task",
+      "value": "TODO: renew passport",
+      "normalized": "TODO: renew passport",
+      "extra": {
+        "rule": "keyword",
+        "done": false
+      }
+    },
+    {
+      "type": "task",
+      "value": "Надо записаться к врачу",
+      "normalized": "Надо записаться к врачу",
+      "extra": {
+        "rule": "keyword",
+        "done": false
+      }
+    }
+  ]
+}

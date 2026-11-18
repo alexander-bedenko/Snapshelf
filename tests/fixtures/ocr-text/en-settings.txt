@@ -1,0 +1,8 @@
+Settings
+Notifications
+Allow notifications from this app
+Choose when you want to be reminded
+Privacy and security
+All data stays on your device
+Storage used: 128 MB of 2 GB
+Need to back up before updating

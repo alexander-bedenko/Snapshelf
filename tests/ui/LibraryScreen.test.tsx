@@ -32,6 +32,7 @@ async function setup(state: Partial<LibraryScreenProps['state']> = {}, strings =
     refresh: jest.fn(),
     openSettings: jest.fn(),
     setQuery: jest.fn(),
+    openScreenshot: jest.fn(),
   };
   const props: LibraryScreenProps = {
     state: {
@@ -212,5 +213,16 @@ describe('LibraryScreen', () => {
         'Найдено 25 скриншотов',
       ]);
     });
+  });
+
+  it('opens a screenshot when its row is tapped', async () => {
+    const { actions } = await setup({
+      counts: { pending: 0, processing: 0, done: 1, failed: 0 },
+      items: [record(7)],
+    });
+
+    fireEvent.press(screen.getByTestId('row-s7'));
+
+    expect(actions.openScreenshot).toHaveBeenCalledWith('s7');
   });
 });

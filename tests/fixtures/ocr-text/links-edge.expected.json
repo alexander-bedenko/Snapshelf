@@ -1,0 +1,40 @@
+{
+  "takenAt": "2026-11-18T10:00",
+  "entities": [
+    {
+      "type": "link",
+      "value": "https://Example.COM/Path?q=1#top",
+      "normalized": "https://example.com/Path?q=1#top"
+    },
+    {
+      "type": "link",
+      "value": "https://en.wikipedia.org/wiki/Foo_(bar)",
+      "normalized": "https://en.wikipedia.org/wiki/Foo_(bar)"
+    },
+    {
+      "type": "link",
+      "value": "www.example.org/files",
+      "normalized": "https://www.example.org/files"
+    },
+    {
+      "type": "link",
+      "value": "example.dev",
+      "normalized": "https://example.dev"
+    },
+    {
+      "type": "link",
+      "value": "disk.example.ru/папка",
+      "normalized": "https://disk.example.ru/папка"
+    },
+    {
+      "type": "link",
+      "value": "https://example.pl/zakupy",
+      "normalized": "https://example.pl/zakupy"
+    },
+    {
+      "type": "email",
+      "value": "Ivan.Petrov@Example.com",
+      "normalized": "ivan.petrov@example.com"
+    }
+  ]
+}

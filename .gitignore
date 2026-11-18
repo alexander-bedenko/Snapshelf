@@ -30,3 +30,7 @@ yarn-error.*
 modules/*/android/build/
 modules/*/android/.gradle/
 .cxx/
+
+# scripts/local-run.cmd output
+/.local-run/
+/local-run.log

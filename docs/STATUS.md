@@ -47,7 +47,16 @@ a Windows build. Pure TS and RN screens only: no native code, no new dependencie
   (so the Polish pangram line "Zażółć gęślą jaźń" is a task: it is an imperative).
 - Library rows do not show how many items were found yet.
 
-## Milestone: M1 — Russian OCR via Tesseract: CODE WRITTEN, NOT BUILT, NOT MEASURED
+## Milestone: M1 — Russian OCR via Tesseract: BUILDS on Windows; CER NOT MEASURED yet
+
+### Local run 2026-11-18 (`scripts/local-run.cmd`, Windows, emulator `snap34`, Android 14)
+
+- `gradlew assembleDebug -PreactNativeArchitectures=x86_64` — **BUILD SUCCESSFUL in 1m 47s** with the Tesseract
+  module (Tesseract4Android 4.9.0 from JitPack): the Kotlin code compiles without changes.
+- **Debug APK x86_64: 121,863,538 bytes** (the ML Kit-only debug APK of 2026-10-31 was 106,456,578 bytes: +15.4 MB,
+  mostly the three tessdata models and Tesseract native libs). Release/arm64 size not measured.
+- The APK installed, Metro started, the dev client was launched. The run stopped after that (the script window was
+  closed before any check ran), so the OCR spike, CER, M3 search and M4 taps are still NOT verified on the emulator.
 
 ### Done (verified here, Linux VM, Jest)
 

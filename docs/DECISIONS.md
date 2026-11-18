@@ -25,6 +25,27 @@
 - **Platforms**: `android`, `ios` only (web removed).
 - **Line endings**: LF enforced via `.gitattributes`.
 
+## M3
+
+- **Order**: M3 before closing M1 (Russian OCR), user decision 2026-11-18. Tesseract is the next step after M3.
+- **Folded search column**: schema v3 adds `screenshots.search_text`, written by the repository with
+  `foldForSearch` (NFC, `ł→l`, `Ł→L`, `ё→е`, `Ё→Е`); the FTS5 index moved from `ocr_text` to `search_text`.
+  Reason: FTS5 `unicode61 remove_diacritics 2` folds Latin diacritics but not `ł` (no decomposition) and not
+  Cyrillic `ё` (checked by failing tests). Custom tokenizers are not available through expo-sqlite, and doing the
+  replace inside FTS triggers would make `rebuild` disagree with the index. Cost: text is stored twice.
+  The v3 backfill uses SQL `replace()` with the same mapping; keep both in sync if the fold changes (then add a
+  migration that recomputes `search_text` and rebuilds the index).
+- **`й` is not folded** to `и`: they are different letters in Russian.
+- **Query building** (`buildFtsQuery`): words = Unicode letters/digits runs, lower-cased, folded, deduplicated,
+  max 8, each as a quoted prefix term `"word"*`, implicit AND. All FTS5 syntax from the input is dropped, so user
+  input can never produce an invalid MATCH.
+- **FTS5 `prefix='2 3'`** index to keep short prefix queries cheap while typing.
+- **Ranking**: `bm25()`, then `taken_at DESC`; default limit 100.
+- **Debounce and races in the store**: 150 ms debounce; a sequence number lets only the newest query write
+  `results`; `results = null` means "no active search", `[]` means "nothing found".
+- **Latency test** runs in Jest on 5,000 deterministic synthetic rows (ru/en/pl vocabulary); it is a regression
+  guard for the query shape, not an on-device measurement.
+
 ## M2
 
 - **Data model**: v1 is the CLAUDE.md section 5 schema; v2 adds `attempts` and `next_retry_at` (retry with backoff,
@@ -59,7 +80,7 @@
 - **No Cyrillic ML Kit artifact exists** on Google Maven (checked `group-index.xml`: only latin, chinese, devanagari,
   japanese, korean). **Measured:** the Latin recognizer gives CER 66.9% on ru fixtures (threshold 10%), en 0.2%, pl 0.6%.
   ML Kit is fine for en/pl; it cannot be used for Russian.
-- **Russian decision: PENDING user confirmation.** Proposal: second `OcrEngine` on Tesseract (`rus+eng+pol`
+- **Russian decision: Tesseract approved by the user (2026-11-18), to be built after M3.** Plan: second `OcrEngine` on Tesseract (`rus+eng+pol`
   traineddata), chosen per detected script, as CLAUDE.md section 7 prescribes. Nothing has been added yet.
 - **Native API**: `ScreenshotOcr.recognize(imageUri, engine)` takes an engine id so a second engine (Tesseract) can be
   added behind the same call if needed. Unknown engine ids reject with `ERR_OCR_ENGINE`.

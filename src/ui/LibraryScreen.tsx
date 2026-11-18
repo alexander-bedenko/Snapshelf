@@ -5,6 +5,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 
@@ -24,8 +25,16 @@ export type LibraryScreenProps = {
     | 'counts'
     | 'items'
     | 'error'
+    | 'query'
+    | 'results'
+    | 'searching'
   >;
-  actions: { requestPermission(): void; refresh(): void; openSettings(): void };
+  actions: {
+    requestPermission(): void;
+    refresh(): void;
+    openSettings(): void;
+    setQuery(query: string): void;
+  };
   strings: Strings;
 };
 
@@ -107,11 +116,15 @@ export function LibraryScreen(props: LibraryScreenProps) {
 
   const total =
     state.counts.pending + state.counts.processing + state.counts.done + state.counts.failed;
+  const results = state.results;
+  const searchActive = results !== null;
   const showEmpty =
+    !searchActive &&
     state.permission === 'granted' &&
     !state.syncing &&
     state.deviceEmpty &&
     state.items.length === 0;
+  const canSearch = total > 0;
 
   return (
     <View style={styles.container}>
@@ -123,6 +136,43 @@ export function LibraryScreen(props: LibraryScreenProps) {
       ) : null}
       {state.error ? <Text style={styles.error}>{strings.error(state.error)}</Text> : null}
       <PermissionCard {...props} />
+      {canSearch ? (
+        <View style={styles.searchRow}>
+          <TextInput
+            accessibilityLabel={strings.searchPlaceholder}
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+            onChangeText={actions.setQuery}
+            placeholder={strings.searchPlaceholder}
+            returnKeyType="search"
+            style={styles.searchInput}
+            testID="search-input"
+            value={state.query}
+          />
+          {state.query ? (
+            <Pressable
+              accessibilityLabel={strings.searchClear}
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={() => actions.setQuery('')}
+              testID="search-clear"
+            >
+              <Text style={styles.clear}>✕</Text>
+            </Pressable>
+          ) : null}
+          {state.searching ? <ActivityIndicator testID="search-busy" /> : null}
+        </View>
+      ) : null}
+      {results && results.length > 0 ? (
+        <Text style={styles.body} testID="search-count">
+          {strings.resultsCount(results.length)}
+        </Text>
+      ) : null}
+      {results && results.length === 0 && !state.searching ? (
+        <Text style={styles.body} testID="search-empty">
+          {strings.noResults(state.query.trim())}
+        </Text>
+      ) : null}
       {showEmpty ? (
         <View style={styles.card} testID="empty-state">
           <Text style={styles.cardTitle}>{strings.emptyTitle}</Text>
@@ -131,7 +181,8 @@ export function LibraryScreen(props: LibraryScreenProps) {
         </View>
       ) : null}
       <FlatList
-        data={state.items}
+        data={results ?? state.items}
+        keyboardShouldPersistTaps="handled"
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <Row item={item} strings={strings} />}
         initialNumToRender={10}
@@ -160,4 +211,14 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, gap: 2 },
   thumb: { width: 56, height: 100, borderRadius: 6, backgroundColor: '#ddd' },
   status: { fontSize: 13, fontWeight: '600', color: '#208AEF' },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 8 },
+  searchInput: {
+    flex: 1,
+    backgroundColor: '#f2f4f8',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+  },
+  clear: { fontSize: 18, color: '#666', paddingHorizontal: 4 },
 });

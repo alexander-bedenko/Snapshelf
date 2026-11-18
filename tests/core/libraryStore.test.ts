@@ -6,10 +6,10 @@ import { ScreenshotPipeline } from '@/core/pipeline/ScreenshotPipeline';
 import { SqliteRepository } from '@/data/SqliteRepository';
 import { FakeScreenshotSource } from '@/platform/media/FakeScreenshotSource';
 import { ControlledOcr } from '../helpers/ControlledOcr';
-import { refs, waitFor } from '../helpers/fixtures';
+import { deferred, refs, waitFor } from '../helpers/fixtures';
 import { openTestDb, tempDbPath } from '../helpers/nodeSqlite';
 
-async function setup(source: FakeScreenshotSource, path = ':memory:') {
+async function setup(source: FakeScreenshotSource, path = ':memory:', searchDelayMs = 0) {
   const db = await openTestDb(path);
   const repo = new SqliteRepository(db);
   const ocr = new ControlledOcr();
@@ -17,7 +17,7 @@ async function setup(source: FakeScreenshotSource, path = ':memory:') {
     { source, ocr, repo },
     { yieldToUi: async () => undefined },
   );
-  const store = createLibraryStore({ source, repo, pipeline, reloadDelayMs: 0 });
+  const store = createLibraryStore({ source, repo, pipeline, reloadDelayMs: 0, searchDelayMs });
   return { db, repo, ocr, pipeline, store, source };
 }
 
@@ -235,5 +235,88 @@ describe('library store: processing and restart', () => {
     store.getState().dispose();
 
     expect(source.listenerCount).toBe(0);
+  });
+});
+
+describe('library store: search', () => {
+  const uri = (n: number) => `content://media/external/images/media/${n}`;
+
+  async function ready(texts: string[]) {
+    const source = new FakeScreenshotSource({ screenshots: refs(texts.length) });
+    const ctx = await setup(source);
+    texts.forEach((text, i) => ctx.ocr.setText(uri(i + 1), text));
+    await ctx.store.getState().init();
+    await waitFor(() => ctx.store.getState().counts.done === texts.length);
+    return ctx;
+  }
+
+  it('finds processed screenshots and clears the search on empty input', async () => {
+    const { store } = await ready(['Купить молоко', 'Zażółć gęślą jaźń', 'meeting notes']);
+
+    store.getState().setQuery('zazolc');
+    await waitFor(() => store.getState().results !== null && !store.getState().searching);
+    expect(store.getState().results?.map((r) => r.id)).toEqual(['s2']);
+
+    store.getState().setQuery('  ');
+    expect(store.getState()).toMatchObject({ query: '  ', results: null, searching: false });
+  });
+
+  it('returns an empty list, not null, when nothing matches', async () => {
+    const { store } = await ready(['alpha']);
+
+    store.getState().setQuery('omega');
+    await waitFor(() => store.getState().results !== null && !store.getState().searching);
+    expect(store.getState().results).toEqual([]);
+  });
+
+  it('debounces keystrokes and only applies the newest query', async () => {
+    const source = new FakeScreenshotSource({ screenshots: [] });
+    const { store, repo } = await setup(source, ':memory:', 20);
+    await store.getState().init();
+    const spy = jest.spyOn(repo, 'search');
+
+    store.getState().setQuery('m');
+    store.getState().setQuery('mi');
+    store.getState().setQuery('mil');
+    await waitFor(() => store.getState().results !== null && !store.getState().searching);
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith('mil', { limit: 100 });
+  });
+
+  it('ignores a slow older result that arrives after a newer one', async () => {
+    const source = new FakeScreenshotSource({ screenshots: [] });
+    const { store, repo } = await setup(source);
+    await store.getState().init();
+    const slow = deferred<never[]>();
+    const original = repo.search.bind(repo);
+    jest
+      .spyOn(repo, 'search')
+      .mockImplementationOnce(() => slow.promise)
+      .mockImplementation(original);
+
+    store.getState().setQuery('first');
+    await waitFor(() => store.getState().searching);
+    store.getState().setQuery('');
+    expect(store.getState().results).toBeNull();
+
+    slow.resolve([]);
+    await new Promise((r) => setTimeout(r, 10));
+    expect(store.getState()).toMatchObject({ results: null, searching: false });
+  });
+
+  it('refreshes the active search when new screenshots are processed', async () => {
+    const source = new FakeScreenshotSource({ screenshots: refs(1) });
+    const { store, ocr } = await setup(source);
+    ocr.setText(uri(1), 'invoice 1');
+    ocr.setText(uri(2), 'invoice 2');
+    await store.getState().init();
+    await waitFor(() => store.getState().counts.done === 1);
+    store.getState().setQuery('invoice');
+    await waitFor(() => store.getState().results?.length === 1);
+
+    source.emitNew(refs(2).slice(1));
+
+    await waitFor(() => store.getState().results?.length === 2);
   });
 });

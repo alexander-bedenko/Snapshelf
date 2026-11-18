@@ -116,8 +116,8 @@ describe('SqliteRepository', () => {
         [q],
       );
     expect(await match('молоко')).toEqual([{ id: 's1' }]);
-    // ł has no Unicode decomposition, so FTS5 keeps it: folding it is an M3 task (see STATUS.md).
-    expect(await match('zazołc')).toEqual([{ id: 's2' }]);
+    // The index holds folded text (ł → l, see foldForSearch), so the raw MATCH needs no ł.
+    expect(await match('zazolc')).toEqual([{ id: 's2' }]);
 
     await repo.markProcessed('s1', { ocrText: 'другой текст', topic: null, processedAt: 2 });
     expect(await match('молоко')).toEqual([]);

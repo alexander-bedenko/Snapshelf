@@ -1,4 +1,5 @@
-import type { ListOptions, ProcessedResult, Repository } from '@/core/repository';
+import type { ListOptions, ProcessedResult, Repository, SearchOptions } from '@/core/repository';
+import { buildFtsQuery, foldForSearch } from '@/core/search/query';
 import type { ScreenshotRecord, ScreenshotRef, ScreenshotStatus } from '@/core/types';
 
 import type { SqlDb } from './sql';
@@ -20,6 +21,9 @@ type Row = {
 
 const COLUMNS =
   'id, uri, taken_at, width, height, status, ocr_text, topic, processed_at, error, attempts, next_retry_at';
+const S_COLUMNS = COLUMNS.split(', ')
+  .map((c) => `s.${c}`)
+  .join(', ');
 
 function toRecord(row: Row): ScreenshotRecord {
   return {
@@ -72,6 +76,21 @@ export class SqliteRepository implements Repository {
     return rows.map(toRecord);
   }
 
+  async search(query: string, { limit = 100 }: SearchOptions = {}): Promise<ScreenshotRecord[]> {
+    const match = buildFtsQuery(query);
+    if (match === null) return [];
+    const rows = await this.db.all<Row>(
+      `SELECT ${S_COLUMNS}
+       FROM screenshots_fts
+       JOIN screenshots s ON s.rowid = screenshots_fts.rowid
+       WHERE screenshots_fts MATCH ?
+       ORDER BY bm25(screenshots_fts), s.taken_at DESC, s.id
+       LIMIT ?`,
+      [match, limit],
+    );
+    return rows.map(toRecord);
+  }
+
   async countByStatus(): Promise<Record<ScreenshotStatus, number>> {
     const counts: Record<ScreenshotStatus, number> = {
       pending: 0,
@@ -118,10 +137,10 @@ export class SqliteRepository implements Repository {
       await tx.run('DELETE FROM entities WHERE screenshot_id = ?', [id]);
       await tx.run(
         `UPDATE screenshots
-         SET status = 'done', ocr_text = ?, topic = ?, processed_at = ?, error = NULL,
-             next_retry_at = NULL
+         SET status = 'done', ocr_text = ?, search_text = ?, topic = ?, processed_at = ?,
+             error = NULL, next_retry_at = NULL
          WHERE id = ?`,
-        [result.ocrText, result.topic, result.processedAt, id],
+        [result.ocrText, foldForSearch(result.ocrText), result.topic, result.processedAt, id],
       );
     });
   }

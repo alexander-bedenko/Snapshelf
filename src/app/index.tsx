@@ -26,6 +26,7 @@ function Connected({ store }: { store: LibraryStore }) {
         requestPermission: () => void state.requestPermission(),
         refresh: () => void state.refresh(),
         openSettings: openAppSettings,
+        setQuery: state.setQuery,
       }}
       strings={strings}
     />

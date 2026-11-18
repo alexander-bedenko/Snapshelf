@@ -56,9 +56,46 @@ ALTER TABLE screenshots ADD COLUMN next_retry_at INTEGER;
 CREATE INDEX idx_screenshots_status ON screenshots(status, next_retry_at);
 `;
 
+// v3 (M3 search): the FTS index moves from `ocr_text` to `search_text`, a folded copy written by
+// the repository with `foldForSearch` (FTS5 folds neither Polish ł nor Cyrillic ё). The backfill below must fold
+// exactly like `foldForSearch` (src/core/search/query.ts); the NFC step is a no-op for stored text.
+const V3 = `
+ALTER TABLE screenshots ADD COLUMN search_text TEXT;
+UPDATE screenshots
+SET search_text = replace(replace(replace(replace(ocr_text, 'ł', 'l'), 'Ł', 'L'), 'ё', 'е'), 'Ё', 'Е')
+WHERE ocr_text IS NOT NULL;
+
+DROP TRIGGER screenshots_ai;
+DROP TRIGGER screenshots_ad;
+DROP TRIGGER screenshots_au;
+DROP TABLE screenshots_fts;
+
+CREATE VIRTUAL TABLE screenshots_fts USING fts5(
+  search_text,
+  content='screenshots',
+  content_rowid='rowid',
+  tokenize='unicode61 remove_diacritics 2',
+  prefix='2 3'
+);
+CREATE TRIGGER screenshots_ai AFTER INSERT ON screenshots BEGIN
+  INSERT INTO screenshots_fts(rowid, search_text) VALUES (new.rowid, new.search_text);
+END;
+CREATE TRIGGER screenshots_ad AFTER DELETE ON screenshots BEGIN
+  INSERT INTO screenshots_fts(screenshots_fts, rowid, search_text)
+  VALUES ('delete', old.rowid, old.search_text);
+END;
+CREATE TRIGGER screenshots_au AFTER UPDATE OF search_text ON screenshots BEGIN
+  INSERT INTO screenshots_fts(screenshots_fts, rowid, search_text)
+  VALUES ('delete', old.rowid, old.search_text);
+  INSERT INTO screenshots_fts(rowid, search_text) VALUES (new.rowid, new.search_text);
+END;
+INSERT INTO screenshots_fts(screenshots_fts) VALUES ('rebuild');
+`;
+
 export const MIGRATIONS: Migration[] = [
   { version: 1, sql: V1 },
   { version: 2, sql: V2 },
+  { version: 3, sql: V3 },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

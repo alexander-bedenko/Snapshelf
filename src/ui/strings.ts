@@ -16,7 +16,19 @@ export type Strings = {
   noText: string;
   loading: string;
   error: (message: string) => string;
+  searchPlaceholder: string;
+  searchClear: string;
+  noResults: (query: string) => string;
+  resultsCount: (count: number) => string;
 };
+
+function ruPlural(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
+}
 
 const en: Strings = {
   title: 'Snapshelf',
@@ -37,6 +49,10 @@ const en: Strings = {
   noText: 'No text found',
   loading: 'Loading…',
   error: (message) => `Something went wrong: ${message}`,
+  searchPlaceholder: 'Search text in screenshots',
+  searchClear: 'Clear search',
+  noResults: (query) => `Nothing found for “${query}”`,
+  resultsCount: (count) => (count === 1 ? '1 screenshot found' : `${count} screenshots found`),
 };
 
 const ru: Strings = {
@@ -58,6 +74,11 @@ const ru: Strings = {
   noText: 'Текст не найден',
   loading: 'Загрузка…',
   error: (message) => `Что-то пошло не так: ${message}`,
+  searchPlaceholder: 'Поиск по тексту скриншотов',
+  searchClear: 'Очистить поиск',
+  noResults: (query) => `По запросу «${query}» ничего не найдено`,
+  resultsCount: (count) =>
+    `${ruPlural(count, 'Найден', 'Найдено', 'Найдено')} ${count} ${ruPlural(count, 'скриншот', 'скриншота', 'скриншотов')}`,
 };
 
 export function getStrings(locale: string): Strings {

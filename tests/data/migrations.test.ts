@@ -66,6 +66,36 @@ describe('migrations', () => {
     expect(hits).toHaveLength(1);
   });
 
+  it('v3 moves the search index to folded text, so existing rows are found without ł/ё', async () => {
+    const path = tempDbPath();
+    const v2 = await openTestDb(path, 2);
+    await v2.run(
+      `INSERT INTO screenshots (id, uri, taken_at, status, ocr_text)
+       VALUES ('a', 'u', 5, 'done', 'Żółw łączy się z Łodzią'), ('b', 'u', 6, 'pending', NULL),
+              ('c', 'u', 7, 'done', 'Всё ЁЛКИ')`,
+    );
+    await v2.close();
+
+    const upgraded = await openTestDb(path);
+
+    const rows = await upgraded.all<{ id: string; search_text: string | null }>(
+      'SELECT id, search_text FROM screenshots ORDER BY id',
+    );
+    expect(rows).toEqual([
+      { id: 'a', search_text: 'Żólw lączy się z Lodzią' },
+      { id: 'b', search_text: null },
+      { id: 'c', search_text: 'Все ЕЛКИ' },
+    ]);
+    const hits = await upgraded.all(
+      `SELECT rowid FROM screenshots_fts WHERE screenshots_fts MATCH 'zolw lodzia'`,
+    );
+    expect(hits).toHaveLength(1);
+    const yo = await upgraded.all(
+      `SELECT rowid FROM screenshots_fts WHERE screenshots_fts MATCH 'елки'`,
+    );
+    expect(yo).toHaveLength(1);
+  });
+
   it('is idempotent when run again on an up-to-date database', async () => {
     const db = await openTestDb();
     expect(await migrate(db)).toBe(LATEST_VERSION);

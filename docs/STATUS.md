@@ -9,6 +9,39 @@
   `ANDROID_AVD_HOME=D:\Android\avd`, WHPX acceleration). JDK 17 and Android SDK installed in M1.
 - Not macOS: iOS cannot be built here.
 
+## Milestone: M3 (full-text search) — DONE in Jest/Node; NOT run on the emulator or a device
+
+M1 is still open (Russian OCR). By user decision (2026-11-18) M3 was done first; Tesseract comes next.
+
+### Verified (commands run, Linux VM, Node 22.23.4, fresh `npm ci`)
+
+- `npm run check` — typecheck, lint, **150 tests in 15 suites** pass; `npm run format:check` passes.
+- `npx expo export --platform android` — the Hermes bundle builds with the search UI.
+- Search on the 6 OCR fixture reference texts (`tests/data/search.test.ts`): word/prefix/multi-word AND queries in
+  ru/en/pl, incl. `zazolc gesla jazn` → `Zażółć gęślą jaźń`, `LODZIA` → `Łodzią`, `wiadomosci` → `Wiadomości`,
+  `отчет` → `отчёт`, `все хорошо` → `Всё хорошо`, digits (`14:00`, `+48 501`), no-hit and no-word queries.
+- Ranking (bm25, then newest), limit, reprocessing updates the index, only processed rows are searchable.
+- Migration v2 → v3 with data: existing text is backfilled, folded and searchable; v1 → v3 still works.
+- **Latency: 5,000 synthetic multilingual rows, 10 queries incl. 2-letter prefixes: worst 8–19 ms** (budget 100 ms,
+  `tests/data/searchPerf.test.ts`). Node's bundled SQLite on a desktop CPU, not expo-sqlite on a phone.
+- Store: debounce (150 ms), only the newest query may write results, empty input clears the search, the active
+  search refreshes when new screenshots are processed. UI: search box (shown once the library has items), results
+  replace the list, result count (ru plurals), "nothing found", clear button, no "nothing found" while a query runs.
+- Mutation checks: removing the stale-result guard fails 1 store test; removing `ł` folding fails 8 search tests.
+
+### NOT verified / known gaps
+
+- **Not run on the emulator or a device in this session** (the session ran in a Linux VM without Android SDK).
+  To verify: rebuild the dev client, open the app, type into the search box. Migration v3 on the existing
+  emulator DB (v2 with 30 rows) is covered by the Jest upgrade test only.
+- On-device query latency is not measured (expected to be higher than in Node; budget leaves ~5x headroom).
+- Russian text is still garbage from ML Kit Latin, so Russian search only works on the fixtures/tests until the
+  Tesseract engine lands (M1).
+- No match highlighting in results; snippet is still the first 140 chars of the text.
+- `й`/`и` are kept distinct on purpose; other Cyrillic letters are not folded.
+- Observed once: under a cold Jest cache `tests/ui/LibraryScreen.test.tsx` failed one test with a timeout in a
+  full parallel run, then passed 4 runs in a row. Not reproduced; watch for flakiness.
+
 ## Milestone: M2 (import + persist) — DONE on the emulator; M1 is still open
 
 M2 was started on the user's explicit request although M1's "Done when" is not met (Russian OCR fails the 10% CER
@@ -50,10 +83,9 @@ swapped in later. Until then Russian screenshots are stored with garbage text (M
   from the index (M5).
 - Large library (thousands of screenshots) not measured.
 - Maestro e2e flow not written (M4 covers e2e).
-- Finding for M3: FTS5 `remove_diacritics` does not fold Polish `ł` (no Unicode decomposition), so `zazolc` will not
-  find `zażółć`. M3 needs query/index folding for `ł`.
+- Finding for M3: FTS5 `remove_diacritics` does not fold Polish `ł`. **Resolved in M3** (folded `search_text`).
 
-## Milestone: M1 (Android OCR spike) — MEASURED; Russian FAILS the threshold, decision pending user confirmation
+## Milestone: M1 (Android OCR spike) — MEASURED; Russian FAILS the threshold; Tesseract approved, not built yet
 
 ### ML Kit (bundled Latin, 16.0.1) results — emulator, 6 synthetic fixtures
 
@@ -78,7 +110,7 @@ Russian output is Latin-lookalike transliteration (e.g. "Заметки" -> "3am
 
 ### NOT done / unverified
 
-- **Russian OCR decision is NOT made** (needs user confirmation before adding Tesseract, see DECISIONS.md).
+- **Russian OCR**: user approved the Tesseract engine (2026-11-18), to be built after M3. Nothing added yet.
 - Measured on an emulator only, not on a physical device. The ML Kit model is the same, but timing is not representative.
 - Instrumented (androidTest) test of the module: not written.
 - Fixtures are synthetic (Segoe UI, clean, 6 images). Real screenshots may score worse; ru has only 519 reference chars.
@@ -137,5 +169,7 @@ npm run ocr:accuracy -- --adb                    # after OCR_SPIKE_DONE appears 
 
 ### Next
 
-- User decision on the Russian OCR engine (see DECISIONS.md, M1); M1 stays open until then.
-- M3: full-text search UI/queries (fold Polish `ł`, latency on 5,000 rows).
+1. Verify M3 on the emulator (rebuild dev client, search in the app, check the v2 → v3 migration on the old DB).
+2. M1: second `OcrEngine` on Tesseract (`rus+eng+pol`), chosen per detected script — user approved doing it after
+   M3 (2026-11-18). Then re-run `npm run ocr:accuracy` and close M1.
+3. M4: extraction + "found items" UI.

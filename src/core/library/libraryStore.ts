@@ -5,6 +5,7 @@ import type { PermissionState, ScreenshotRecord, ScreenshotStatus } from '@/core
 import type { ScreenshotSource } from '@/platform/media/ScreenshotSource';
 
 import type { ScreenshotPipeline } from '../pipeline/ScreenshotPipeline';
+import { buildFtsQuery } from '../search/query';
 
 export type LibraryState = {
   /** `unknown` until the first check finishes. */
@@ -17,7 +18,14 @@ export type LibraryState = {
   counts: Record<ScreenshotStatus, number>;
   items: ScreenshotRecord[];
   error: string | null;
+  /** Current search input, as typed. */
+  query: string;
+  /** Search hits for `query`; `null` when there is no active search. */
+  results: ScreenshotRecord[] | null;
+  searching: boolean;
   init(): Promise<void>;
+  /** Updates the search input; the query runs after a short debounce. */
+  setQuery(query: string): void;
   requestPermission(): Promise<void>;
   refresh(): Promise<void>;
   /** Call when the app returns to the foreground (e.g. after the user visited system settings). */
@@ -34,6 +42,9 @@ export type LibraryDeps = {
   listLimit?: number;
   /** Trailing throttle for DB reloads while the pipeline is busy. */
   reloadDelayMs?: number;
+  /** Debounce between keystrokes and the search query. */
+  searchDelayMs?: number;
+  searchLimit?: number;
 };
 
 const EMPTY_COUNTS: Record<ScreenshotStatus, number> = {
@@ -47,8 +58,13 @@ export function createLibraryStore(deps: LibraryDeps): LibraryStore {
   const { source, repo, pipeline } = deps;
   const listLimit = deps.listLimit ?? 200;
   const reloadDelayMs = deps.reloadDelayMs ?? 250;
+  const searchDelayMs = deps.searchDelayMs ?? 150;
+  const searchLimit = deps.searchLimit ?? 100;
   let unwatch: (() => void) | null = null;
   let reloadTimer: ReturnType<typeof setTimeout> | undefined;
+  let searchTimer: ReturnType<typeof setTimeout> | undefined;
+  // Only the newest search may write results, so a slow older query cannot overwrite them.
+  let searchSeq = 0;
   let disposed = false;
 
   const store: LibraryStore = createStore<LibraryState>(() => ({
@@ -60,7 +76,11 @@ export function createLibraryStore(deps: LibraryDeps): LibraryStore {
     counts: EMPTY_COUNTS,
     items: [],
     error: null,
+    query: '',
+    results: null,
+    searching: false,
     init,
+    setQuery,
     requestPermission,
     refresh,
     onForeground,
@@ -80,6 +100,39 @@ export function createLibraryStore(deps: LibraryDeps): LibraryStore {
       repo.list({ limit: listLimit }),
     ]);
     if (!disposed) set({ counts, items });
+    // Newly processed screenshots may match the active search.
+    if (store.getState().results !== null) await runSearch();
+  }
+
+  async function runSearch() {
+    const seq = ++searchSeq;
+    const { query } = store.getState();
+    if (buildFtsQuery(query) === null) {
+      set({ results: null, searching: false });
+      return;
+    }
+    set({ searching: true });
+    try {
+      const results = await repo.search(query, { limit: searchLimit });
+      if (seq === searchSeq && !disposed) set({ results });
+    } finally {
+      if (seq === searchSeq && !disposed) set({ searching: false });
+    }
+  }
+
+  function setQuery(query: string) {
+    set({ query });
+    clearTimeout(searchTimer);
+    searchTimer = undefined;
+    if (buildFtsQuery(query) === null) {
+      searchSeq++; // drop any query still in flight
+      set({ results: null, searching: false });
+      return;
+    }
+    searchTimer = setTimeout(() => {
+      searchTimer = undefined;
+      runSearch().catch(fail);
+    }, searchDelayMs);
   }
 
   function scheduleReload() {
@@ -167,6 +220,7 @@ export function createLibraryStore(deps: LibraryDeps): LibraryStore {
   function dispose() {
     disposed = true;
     clearTimeout(reloadTimer);
+    clearTimeout(searchTimer);
     unwatch?.();
     unwatch = null;
     unsubscribePipeline();

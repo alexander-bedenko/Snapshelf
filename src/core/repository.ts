@@ -12,6 +12,10 @@ export type ListOptions = {
   status?: ScreenshotStatus;
 };
 
+export type SearchOptions = {
+  limit?: number;
+};
+
 export interface Repository {
   /** Inserts unknown screenshots as `pending`; never touches existing rows. Returns inserted count. */
   upsertDiscovered(refs: ScreenshotRef[]): Promise<number>;
@@ -24,6 +28,12 @@ export interface Repository {
   markProcessed(id: string, result: ProcessedResult): Promise<void>;
   /** `nextRetryAt = null` means no more automatic retries. */
   markFailed(id: string, error: string, nextRetryAt: number | null): Promise<void>;
+  /**
+   * Full-text search over recognized text: every word of `query` must match as a prefix,
+   * case- and diacritics-insensitive (ru/en/pl). Best match first, then newest.
+   * Returns `[]` for a query without words.
+   */
+  search(query: string, options?: SearchOptions): Promise<ScreenshotRecord[]>;
   /** After a crash/kill: `processing` rows go back to `pending` (or `failed` if out of attempts). */
   recoverInterrupted(maxAttempts: number): Promise<number>;
 }

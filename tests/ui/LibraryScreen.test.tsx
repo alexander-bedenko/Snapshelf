@@ -27,7 +27,12 @@ function record(n: number, overrides: Partial<ScreenshotRecord> = {}): Screensho
 }
 
 async function setup(state: Partial<LibraryScreenProps['state']> = {}, strings = en) {
-  const actions = { requestPermission: jest.fn(), refresh: jest.fn(), openSettings: jest.fn() };
+  const actions = {
+    requestPermission: jest.fn(),
+    refresh: jest.fn(),
+    openSettings: jest.fn(),
+    setQuery: jest.fn(),
+  };
   const props: LibraryScreenProps = {
     state: {
       permission: 'granted',
@@ -38,6 +43,9 @@ async function setup(state: Partial<LibraryScreenProps['state']> = {}, strings =
       counts: { pending: 0, processing: 0, done: 0, failed: 0 },
       items: [],
       error: null,
+      query: '',
+      results: null,
+      searching: false,
       ...state,
     },
     actions,
@@ -135,5 +143,74 @@ describe('LibraryScreen', () => {
     await setup({ permission: 'undetermined' }, ru);
     expect(screen.getByText(ru.permissionBody)).toBeTruthy();
     expect(ru.permissionBody).not.toBe(en.permissionBody);
+  });
+
+  describe('search', () => {
+    const counts = { pending: 0, processing: 0, done: 2, failed: 0 };
+
+    it('has no search box until something is in the library', async () => {
+      await setup({ permission: 'undetermined' });
+      expect(screen.queryByTestId('search-input')).toBeNull();
+    });
+
+    it('passes typed text to setQuery', async () => {
+      const { actions } = await setup({ counts, items: [record(1), record(2)] });
+
+      fireEvent.changeText(screen.getByTestId('search-input'), 'молоко');
+
+      expect(actions.setQuery).toHaveBeenCalledWith('молоко');
+      expect(screen.getByPlaceholderText(en.searchPlaceholder)).toBeTruthy();
+    });
+
+    it('shows search results instead of the library', async () => {
+      await setup({
+        counts,
+        items: [record(1), record(2)],
+        query: 'text 2',
+        results: [record(2)],
+      });
+
+      expect(screen.getByTestId('row-s2')).toBeTruthy();
+      expect(screen.queryByTestId('row-s1')).toBeNull();
+      expect(screen.getByText('1 screenshot found')).toBeTruthy();
+    });
+
+    it('says when nothing was found and clears the query', async () => {
+      const { actions } = await setup({
+        counts,
+        items: [record(1)],
+        query: ' omega ',
+        results: [],
+      });
+
+      expect(screen.getByText(en.noResults('omega'))).toBeTruthy();
+      expect(screen.queryByTestId('row-s1')).toBeNull();
+      fireEvent.press(screen.getByTestId('search-clear'));
+      expect(actions.setQuery).toHaveBeenCalledWith('');
+    });
+
+    it('does not claim "nothing found" while the query is still running', async () => {
+      await setup({ counts, items: [record(1)], query: 'om', results: [], searching: true });
+
+      expect(screen.queryByTestId('search-empty')).toBeNull();
+      expect(screen.getByTestId('search-busy')).toBeTruthy();
+    });
+
+    it('does not show the "no screenshots" empty state during a search', async () => {
+      await setup({ counts, deviceEmpty: true, items: [], query: 'x', results: [] });
+      expect(screen.queryByTestId('empty-state')).toBeNull();
+    });
+
+    it('pluralizes the result count in Russian', () => {
+      expect([1, 2, 5, 11, 21, 22, 25].map(ru.resultsCount)).toEqual([
+        'Найден 1 скриншот',
+        'Найдено 2 скриншота',
+        'Найдено 5 скриншотов',
+        'Найдено 11 скриншотов',
+        'Найден 21 скриншот',
+        'Найдено 22 скриншота',
+        'Найдено 25 скриншотов',
+      ]);
+    });
   });
 });
